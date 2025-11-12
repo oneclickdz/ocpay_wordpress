@@ -1,0 +1,23 @@
+{
+	"name": "oneclickdz/ocpay-woocommerce",
+	"type": "wordpress-plugin",
+	"description": "OCPay for WooCommerce - Accept secure payments via OCPay powered by SATIM",
+	"version": "1.0.1",
+	"author": {
+		"name": "OneClick DZ",
+		"url": "https://oneclickdz.com"
+	},
+	"license": "GPL-3.0-or-later",
+	"require": {
+		"php": ">=7.2"
+	},
+	"require-dev": {
+		"woocommerce/woocommerce": ">=4.0"
+	},
+	"extra": {
+		"woocommerce": {
+			"min_wc_version": "4.0",
+			"max_wc_version": "10.3.4"
+		}
+	}
+}

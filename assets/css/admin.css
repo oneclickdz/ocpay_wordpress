@@ -1,0 +1,156 @@
+/* OCPay WooCommerce Admin Styles */
+
+.ocpay-dashboard {
+    margin: 20px 0;
+}
+
+.ocpay-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+    gap: 20px;
+    margin: 20px 0;
+}
+
+.ocpay-card {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 20px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.ocpay-card h2 {
+    margin-top: 0;
+    color: #1e1e1e;
+    font-size: 18px;
+    border-bottom: 3px solid #0073aa;
+    padding-bottom: 10px;
+    margin-bottom: 15px;
+}
+
+.ocpay-card table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.ocpay-card table th {
+    text-align: left;
+    padding: 10px 8px;
+    border-bottom: 1px solid #eee;
+    font-weight: 600;
+    background-color: #f9f9f9;
+    width: 50%;
+}
+
+.ocpay-card table td {
+    padding: 10px 8px;
+    border-bottom: 1px solid #eee;
+}
+
+.ocpay-card table tr:last-child td,
+.ocpay-card table tr:last-child th {
+    border-bottom: none;
+}
+
+.ocpay-card textarea {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 10px;
+    background-color: #f5f5f5;
+    font-size: 11px;
+    font-family: 'Courier New', monospace;
+}
+
+.ocpay-card .button {
+    margin-top: 10px;
+    margin-right: 10px;
+}
+
+.ocpay-card p {
+    margin: 0 0 15px 0;
+}
+
+/* Status indicators */
+.ocpay-status-success {
+    color: #27ae60;
+    font-weight: 600;
+    display: inline-block;
+}
+
+.ocpay-status-error {
+    color: #e74c3c;
+    font-weight: 600;
+    display: inline-block;
+}
+
+.ocpay-status-warning {
+    color: #f39c12;
+    font-weight: 600;
+    display: inline-block;
+}
+
+.ocpay-status-info {
+    color: #0073aa;
+    font-weight: 600;
+    display: inline-block;
+}
+
+/* Connection result box */
+#ocpay-connection-result {
+    padding: 10px;
+    border-radius: 4px;
+    margin-top: 10px;
+}
+
+#ocpay-connection-result p {
+    margin: 0;
+}
+
+/* Settings page styles */
+.woocommerce-settings-panel {
+    background: white;
+}
+
+.woocommerce-settings-panel input[type="password"] {
+    max-width: 400px;
+}
+
+.woocommerce-settings-panel select {
+    max-width: 400px;
+}
+
+.woocommerce-settings-panel textarea {
+    max-width: 600px;
+    min-height: 100px;
+}
+
+/* Admin notices */
+.notice.is-dismissible {
+    margin: 20px 0;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .ocpay-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .ocpay-card {
+        padding: 15px;
+    }
+
+    .ocpay-card h2 {
+        font-size: 16px;
+    }
+
+    .ocpay-card table th,
+    .ocpay-card table td {
+        padding: 8px 6px;
+        font-size: 13px;
+    }
+
+    .ocpay-card textarea {
+        font-size: 10px;
+        height: 200px !important;
+    }
+}

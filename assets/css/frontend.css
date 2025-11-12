@@ -1,0 +1,205 @@
+/* OCPay WooCommerce Frontend Styles */
+
+/* Payment Gateway Display */
+.woocommerce form .payment_box.payment_method_ocpay {
+    display: block;
+    clear: both;
+}
+
+.woocommerce form .payment_box.payment_method_ocpay p {
+    margin: 0 0 10px;
+}
+
+.payment_method_ocpay .payment_gateway_logo {
+    display: inline-block;
+    margin-right: 10px;
+    vertical-align: middle;
+}
+
+.payment_method_ocpay .payment_gateway_logo img {
+    max-width: 100px;
+    height: auto;
+}
+
+/* OCPay Payment Page */
+.ocpay-payment-container {
+    max-width: 600px;
+    margin: 40px auto;
+    padding: 20px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    text-align: center;
+}
+
+.ocpay-payment-header {
+    margin-bottom: 30px;
+}
+
+.ocpay-payment-header h1 {
+    color: #333;
+    margin: 0 0 10px;
+    font-size: 24px;
+}
+
+.ocpay-payment-header p {
+    color: #666;
+    margin: 0;
+}
+
+.ocpay-order-details {
+    background: #f9f9f9;
+    padding: 15px;
+    border-radius: 4px;
+    margin: 20px 0;
+    text-align: left;
+}
+
+.ocpay-order-details dt {
+    font-weight: 600;
+    color: #333;
+    margin-top: 10px;
+}
+
+.ocpay-order-details dt:first-child {
+    margin-top: 0;
+}
+
+.ocpay-order-details dd {
+    color: #666;
+    margin: 5px 0 0 0;
+    padding-left: 20px;
+}
+
+/* Payment Status Messages */
+.ocpay-status-message {
+    padding: 15px;
+    margin: 20px 0;
+    border-radius: 4px;
+    border-left: 4px solid #0073aa;
+}
+
+.ocpay-status-message.success {
+    background-color: #d4edda;
+    border-left-color: #27ae60;
+    color: #155724;
+}
+
+.ocpay-status-message.error {
+    background-color: #f8d7da;
+    border-left-color: #e74c3c;
+    color: #721c24;
+}
+
+.ocpay-status-message.warning {
+    background-color: #fff3cd;
+    border-left-color: #f39c12;
+    color: #856404;
+}
+
+.ocpay-status-message.info {
+    background-color: #d1ecf1;
+    border-left-color: #0073aa;
+    color: #0c5460;
+}
+
+.ocpay-status-message p {
+    margin: 0;
+}
+
+/* Payment Button */
+.button.ocpay-pay-button {
+    background-color: #0073aa;
+    color: white;
+    border: none;
+    padding: 12px 30px;
+    font-size: 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.button.ocpay-pay-button:hover {
+    background-color: #005a87;
+    text-decoration: none;
+}
+
+.button.ocpay-pay-button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+/* Loading Spinner */
+.ocpay-spinner {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 3px solid #f3f3f3;
+    border-top: 3px solid #0073aa;
+    border-radius: 50%;
+    animation: ocpay-spin 1s linear infinite;
+    margin-right: 10px;
+    vertical-align: middle;
+}
+
+@keyframes ocpay-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Checkout Integration */
+.wc_payment_method.payment_method_ocpay {
+    margin-bottom: 20px;
+    padding: 15px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.wc_payment_method.payment_method_ocpay input[type="radio"] {
+    margin-right: 10px;
+}
+
+.wc_payment_method.payment_method_ocpay label {
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .ocpay-payment-container {
+        padding: 15px;
+        margin: 20px auto;
+    }
+
+    .ocpay-payment-header h1 {
+        font-size: 20px;
+    }
+
+    .button.ocpay-pay-button {
+        width: 100%;
+        padding: 15px;
+        font-size: 14px;
+    }
+
+    .ocpay-order-details {
+        padding: 12px;
+    }
+
+    .ocpay-status-message {
+        padding: 12px;
+        margin: 15px 0;
+    }
+}
+
+/* Accessibility */
+.button.ocpay-pay-button:focus {
+    outline: 2px solid #0073aa;
+    outline-offset: 2px;
+}
+
+.wc_payment_method.payment_method_ocpay label:focus {
+    outline: 2px solid #0073aa;
+    outline-offset: 2px;
+}
