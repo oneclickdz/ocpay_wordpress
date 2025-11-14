@@ -113,15 +113,25 @@ class OCPay_API_Client {
 		}
 
 		// Prepare request body
+		// NOTE: OCPay API does NOT accept currency field - all amounts are in DZD
 		$body = array(
 			'productInfo' => array(
-				'title'    => OCPay_Validator::sanitize_description( $args['title'] ),
-				'amount'   => (float) $args['amount'],
-				'currency' => strtoupper( $args['currency'] ),
+				'title'  => OCPay_Validator::sanitize_description( $args['title'] ),
+				'amount' => (float) $args['amount'],
 			),
 			'redirectUrl' => esc_url_raw( $args['redirectUrl'] ),
-			'feeMode'     => strtoupper( $args['feeMode'] ),
 		);
+
+		// Add feeMode only if it's not the default
+		if ( 'NO_FEE' !== $args['feeMode'] ) {
+			$body['feeMode'] = strtoupper( $args['feeMode'] );
+		}
+
+		// Log the request body for debugging
+		$this->logger->debug( 'Creating payment link with data', array(
+			'body' => $body,
+			'args' => $args,
+		) );
 
 		// Make API request
 		$response = $this->make_request(
@@ -229,6 +239,8 @@ class OCPay_API_Client {
 			'method'   => $method,
 			'endpoint' => $endpoint,
 			'url'      => $url,
+			'headers'  => array_merge( $headers, array( 'X-Access-Token' => '***HIDDEN***' ) ),
+			'body'     => 'POST' === $method ? wp_json_encode( $body ) : 'N/A',
 		) );
 
 		// Make HTTP request
@@ -252,16 +264,28 @@ class OCPay_API_Client {
 
 		// Log response
 		$this->logger->debug( 'API response received', array(
-			'code' => $response_code,
-			'body' => $data,
+			'code'           => $response_code,
+			'body'           => $data,
+			'raw_body'       => $response_body,
+			'json_error'     => json_last_error_msg(),
+			'response_headers' => wp_remote_retrieve_headers( $response ),
 		) );
 
 		// Handle HTTP errors
 		if ( $response_code < 200 || $response_code >= 300 ) {
-			$error_message = isset( $data['message'] ) ? $data['message'] : 'Unknown error';
+			// Extract error message from nested structure if available
+			$error_message = 'Unknown error';
+			if ( isset( $data['error']['message'] ) ) {
+				$error_message = $data['error']['message'];
+			} elseif ( isset( $data['message'] ) ) {
+				$error_message = $data['message'];
+			}
+
 			$this->logger->error( 'API request returned error', array(
-				'code'    => $response_code,
-				'message' => $error_message,
+				'code'           => $response_code,
+				'message'        => $error_message,
+				'full_response'  => $data,
+				'raw_body'       => $response_body,
 			) );
 			return new WP_Error(
 				'api_error_' . $response_code,

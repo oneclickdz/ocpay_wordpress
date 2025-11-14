@@ -277,7 +277,7 @@ class OCPay_Payment_Gateway extends WC_Payment_Gateway {
 	 * Process payment
 	 *
 	 * @param int $order_id Order ID.
-	 * @return array|bool
+	 * @return array
 	 */
 	public function process_payment( $order_id ) {
 		$this->logger->info( 'Processing payment for order', array( 'order_id' => $order_id ) );
@@ -287,7 +287,10 @@ class OCPay_Payment_Gateway extends WC_Payment_Gateway {
 		if ( ! $order ) {
 			$this->logger->error( 'Order not found', array( 'order_id' => $order_id ) );
 			wc_add_notice( esc_html__( 'Order not found.', 'ocpay-woocommerce' ), 'error' );
-			return false;
+			return array(
+				'result'   => 'failure',
+				'messages' => array( esc_html__( 'Order not found.', 'ocpay-woocommerce' ) ),
+			);
 		}
 
 		// Prepare payment link data
@@ -299,6 +302,16 @@ class OCPay_Payment_Gateway extends WC_Payment_Gateway {
 			'feeMode'     => $this->get_option( 'fee_mode', 'NO_FEE' ),
 		);
 
+		// Check if API client is initialized
+		if ( ! $this->api_client ) {
+			$this->logger->error( 'API client not initialized - missing API key', array( 'order_id' => $order_id ) );
+			wc_add_notice( esc_html__( 'Payment gateway not properly configured. Please contact support.', 'ocpay-woocommerce' ), 'error' );
+			return array(
+				'result'   => 'failure',
+				'messages' => array( esc_html__( 'Payment gateway not properly configured.', 'ocpay-woocommerce' ) ),
+			);
+		}
+
 		// Create payment link via API
 		$response = $this->api_client->create_payment_link( $payment_data );
 
@@ -308,7 +321,10 @@ class OCPay_Payment_Gateway extends WC_Payment_Gateway {
 				'error'    => $response->get_error_message(),
 			) );
 			wc_add_notice( esc_html__( 'Payment gateway error. Please try again.', 'ocpay-woocommerce' ), 'error' );
-			return false;
+			return array(
+				'result'   => 'failure',
+				'messages' => array( esc_html__( 'Payment gateway error. Please try again.', 'ocpay-woocommerce' ) ),
+			);
 		}
 
 		// Extract payment details from response
@@ -321,7 +337,10 @@ class OCPay_Payment_Gateway extends WC_Payment_Gateway {
 				'response' => $response,
 			) );
 			wc_add_notice( esc_html__( 'Payment gateway error. Please try again.', 'ocpay-woocommerce' ), 'error' );
-			return false;
+			return array(
+				'result'   => 'failure',
+				'messages' => array( esc_html__( 'Payment gateway error. Please try again.', 'ocpay-woocommerce' ) ),
+			);
 		}
 
 		// Save payment reference to order meta

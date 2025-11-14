@@ -23,8 +23,9 @@ class OCPay_Validator {
 	public static function validate_amount( $amount ) {
 		$amount = (float) $amount;
 
-		if ( $amount <= 0 ) {
-			return esc_html__( 'Payment amount must be greater than 0.', 'ocpay-woocommerce' );
+		// OCPay requires minimum 500 DZD
+		if ( $amount < 500 ) {
+			return esc_html__( 'Payment amount must be at least 500 DZD.', 'ocpay-woocommerce' );
 		}
 
 		// Check for reasonable max amount (e.g., 100,000,000 DZD)
@@ -42,12 +43,12 @@ class OCPay_Validator {
 	 * @return bool|string True if valid, error message if invalid.
 	 */
 	public static function validate_currency( $currency ) {
-		$allowed_currencies = array( 'DZD', 'USD', 'EUR' );
-		$currency           = strtoupper( $currency );
+		// OCPay only supports DZD (Algerian Dinar)
+		$currency = strtoupper( $currency );
 
-		if ( ! in_array( $currency, $allowed_currencies, true ) ) {
+		if ( 'DZD' !== $currency ) {
 			return sprintf(
-				esc_html__( 'Currency %s is not supported.', 'ocpay-woocommerce' ),
+				esc_html__( 'OCPay only supports DZD currency. You are using %s.', 'ocpay-woocommerce' ),
 				esc_html( $currency )
 			);
 		}
