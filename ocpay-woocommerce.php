@@ -387,18 +387,30 @@ if (defined('WP_DEBUG') && WP_DEBUG) {
 // Initialize the gateway after WooCommerce is fully loaded
 add_action('woocommerce_loaded', 'init_ocpay_gateway');
 
-// Early blocks initialization
-add_action('init', function() {
-    if (class_exists('WooCommerce') && class_exists('Automattic\WooCommerce\Blocks\Payments\PaymentMethodRegistry')) {
-        // Ensure blocks support is available early
-        add_action('woocommerce_blocks_payment_method_type_registration', function($payment_method_registry) {
-            if (class_exists('OCPay_Block_Support')) {
-                $payment_method_registry->register(new OCPay_Block_Support());
-                error_log('OCPay: Early registration with blocks payment method registry');
-            }
-        });
+// Register OCPay payment method with WooCommerce Blocks
+add_action('woocommerce_blocks_payment_method_type_registration', function($payment_method_registry) {
+    // Include the payment block class only when blocks are being loaded
+    if (!class_exists('OCPay_Payment_Block')) {
+        $payment_block_file = OCPAY_WOOCOMMERCE_PATH . 'includes/class-ocpay-payment-block.php';
+        if (file_exists($payment_block_file)) {
+            require_once $payment_block_file;
+        } else {
+            error_log('OCPay: Payment block class file not found at ' . $payment_block_file);
+            return;
+        }
     }
-});
+    
+    if (class_exists('OCPay_Payment_Block')) {
+        try {
+            $payment_method_registry->register(new OCPay_Payment_Block());
+            error_log('OCPay: Successfully registered OCPay_Payment_Block with WooCommerce Blocks payment method registry');
+        } catch (Exception $e) {
+            error_log('OCPay: Error registering payment block - ' . $e->getMessage());
+        }
+    } else {
+        error_log('OCPay: OCPay_Payment_Block class not found during registration');
+    }
+}, 10);
 
 /**
  * Check and log OCPay gateway settings
@@ -709,13 +721,13 @@ function ocpay_woocommerce_missing_notice() {
 add_action('woocommerce_blocks_loaded', function() {
     error_log('OCPay: woocommerce_blocks_loaded action triggered');
     
-    // Initialize blocks support - this handles script enqueuing
+    // Initialize blocks support via JavaScript registration and data localization
     if (class_exists('OCPay_Block_Support')) {
         OCPay_Block_Support::init();
-        error_log('OCPay: WooCommerce Blocks support initialized');
+        error_log('OCPay: WooCommerce Blocks support initialized (JavaScript + PHP integration)');
     }
     
-    error_log('OCPay: WooCommerce Blocks environment detected and configured');
+    error_log('OCPay: WooCommerce Blocks environment ready');
 }, 0);
 
 // Add debug endpoint
