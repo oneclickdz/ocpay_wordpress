@@ -278,17 +278,31 @@ class OCPay_Payment_Gateway extends WC_Payment_Gateway {
 				'type'        => 'title',
 				'description' => esc_html__( 'Enable detailed logging for troubleshooting', 'ocpay-woocommerce' ),
 			),
-			'debug_mode'    => array(
-				'title'       => esc_html__( 'Debug Mode', 'ocpay-woocommerce' ),
-				'label'       => esc_html__( 'Enable Debug Logging', 'ocpay-woocommerce' ),
-				'type'        => 'checkbox',
-				'description' => esc_html__( 'Enable detailed logging for debugging purposes.', 'ocpay-woocommerce' ),
-				'default'     => 'no',
+		'debug_mode'    => array(
+			'title'       => esc_html__( 'Debug Mode', 'ocpay-woocommerce' ),
+			'label'       => esc_html__( 'Enable Debug Logging', 'ocpay-woocommerce' ),
+			'type'        => 'checkbox',
+			'description' => esc_html__( 'Enable detailed logging for debugging purposes.', 'ocpay-woocommerce' ),
+			'default'     => 'no',
+		),
+		'status_section' => array(
+			'title'       => esc_html__( 'Order Status Settings', 'ocpay-woocommerce' ),
+			'type'        => 'title',
+			'description' => esc_html__( 'Configure order status after successful payment', 'ocpay-woocommerce' ),
+		),
+		'order_status_after_payment' => array(
+			'title'       => esc_html__( 'Order Status After Successful Payment', 'ocpay-woocommerce' ),
+			'type'        => 'select',
+			'description' => esc_html__( 'Choose which status the order should have after a successful payment confirmation.', 'ocpay-woocommerce' ),
+			'default'     => 'processing',
+			'desc_tip'    => true,
+			'options'     => array(
+				'completed'  => esc_html__( 'Completed', 'ocpay-woocommerce' ),
+				'processing' => esc_html__( 'Processing', 'ocpay-woocommerce' ),
 			),
-		);
-	}
-
-	/**
+		),
+	);
+}	/**
 	 * Process payment
 	 *
 	 * @param int $order_id Order ID.

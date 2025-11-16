@@ -46,11 +46,11 @@ add_action( 'before_woocommerce_init', function() {
 
 // Register activation/deactivation hooks
 register_activation_hook( __FILE__, function() {
-	// Schedule status polling cron job
+	// Schedule status polling cron job - every 20 minutes
 	if ( ! wp_next_scheduled( 'wp_scheduled_event_ocpay_check_payment_status' ) ) {
 		wp_schedule_event(
 			time(),
-			'ocpay_every_5_minutes',
+			'ocpay_every_20_minutes',
 			'wp_scheduled_event_ocpay_check_payment_status'
 		);
 	}
@@ -136,6 +136,7 @@ class OCPay_WooCommerce {
 		require_once OCPAY_WOOCOMMERCE_PATH . 'includes/class-ocpay-payment-gateway.php';
 		require_once OCPAY_WOOCOMMERCE_PATH . 'includes/class-ocpay-settings.php';
 		require_once OCPAY_WOOCOMMERCE_PATH . 'includes/class-ocpay-order-handler.php';
+		require_once OCPAY_WOOCOMMERCE_PATH . 'includes/class-ocpay-status-checker.php';
 	}
 
 	/**
@@ -181,7 +182,7 @@ class OCPay_WooCommerce {
 		// Include WooCommerce dependent files
 		$this->includes();
 
-		// Initialize status polling
+		// Initialize status polling with 20-minute schedule
 		add_action( 'wp_scheduled_event_ocpay_check_payment_status', array( $this, 'check_pending_payments' ) );
 
 		// Register custom cron schedule
@@ -266,10 +267,10 @@ class OCPay_WooCommerce {
 	 * @return array
 	 */
 	public function add_cron_schedules( $schedules ) {
-		if ( ! isset( $schedules['ocpay_every_5_minutes'] ) ) {
-			$schedules['ocpay_every_5_minutes'] = array(
-				'interval' => 5 * MINUTE_IN_SECONDS,
-				'display'  => esc_html__( 'Every 5 Minutes', 'ocpay-woocommerce' ),
+		if ( ! isset( $schedules['ocpay_every_20_minutes'] ) ) {
+			$schedules['ocpay_every_20_minutes'] = array(
+				'interval' => 20 * MINUTE_IN_SECONDS,
+				'display'  => esc_html__( 'Every 20 Minutes', 'ocpay-woocommerce' ),
 			);
 		}
 		return $schedules;
@@ -281,8 +282,10 @@ class OCPay_WooCommerce {
 	 * @return void
 	 */
 	public function check_pending_payments() {
-		// This will be implemented in Phase 4
-		// For now, just a placeholder
+		// Delegate to status checker
+		if ( class_exists( 'OCPay_Status_Checker' ) ) {
+			OCPay_Status_Checker::get_instance()->check_pending_payments();
+		}
 	}
 
 	/**
@@ -338,11 +341,11 @@ class OCPay_WooCommerce {
 	 * @return void
 	 */
 	public function activate() {
-		// Schedule status polling cron job
+		// Schedule status polling cron job - every 20 minutes
 		if ( ! wp_next_scheduled( 'wp_scheduled_event_ocpay_check_payment_status' ) ) {
 			wp_schedule_event(
 				time(),
-				'ocpay_every_5_minutes',
+				'ocpay_every_20_minutes',
 				'wp_scheduled_event_ocpay_check_payment_status'
 			);
 		}
@@ -378,6 +381,7 @@ require_once OCPAY_WOOCOMMERCE_PATH . 'includes/class-ocpay-logger.php';
 require_once OCPAY_WOOCOMMERCE_PATH . 'includes/class-ocpay-error-handler.php';
 require_once OCPAY_WOOCOMMERCE_PATH . 'includes/class-ocpay-validator.php';
 require_once OCPAY_WOOCOMMERCE_PATH . 'includes/class-ocpay-block-support.php';
+require_once OCPAY_WOOCOMMERCE_PATH . 'includes/class-ocpay-security.php';
 
 // Include debug functions in development mode
 if (defined('WP_DEBUG') && WP_DEBUG) {
