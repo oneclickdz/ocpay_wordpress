@@ -199,23 +199,31 @@ class OCPay_Status_Checker {
 	 */
 	private function get_pending_orders() {
 		$args = array(
-			'limit'              => $this->max_checks_per_run,
-			'status'             => 'pending',
-			'payment_method'     => 'ocpay',
-			'meta_query'         => array(
+			'limit'          => $this->max_checks_per_run,
+			'status'         => array( 'pending' ),
+			'payment_method' => 'ocpay',
+			'meta_query'     => array(
 				array(
 					'key'     => '_ocpay_payment_ref',
 					'compare' => 'EXISTS',
 				),
 			),
-			'orderby'            => 'date',
-			'order'              => 'ASC',
-			'return'             => 'ids',
+			'orderby'        => 'date',
+			'order'          => 'ASC',
+			'return'         => 'objects',
 		);
 
-		// Use WooCommerce query for HPOS compatibility
-		$query = new WC_Order_Query( $args );
-		return $query->get_posts();
+		$query  = new WC_Order_Query( $args );
+		$orders = $query->get_orders();
+		$order_ids = array();
+		if ( is_array( $orders ) ) {
+			foreach ( $orders as $order ) {
+				if ( $order instanceof WC_Order ) {
+					$order_ids[] = $order->get_id();
+				}
+			}
+		}
+		return $order_ids;
 	}
 
 	/**
@@ -472,7 +480,8 @@ class OCPay_Status_Checker {
 	 */
 	public function get_status_counts() {
 		$args = array(
-			'status'         => 'pending',
+			'limit'          => -1,
+			'status'         => array( 'pending' ),
 			'payment_method' => 'ocpay',
 			'meta_query'     => array(
 				array(
@@ -480,12 +489,11 @@ class OCPay_Status_Checker {
 					'compare' => 'EXISTS',
 				),
 			),
-			'return'         => 'ids',
-			'limit'          => -1,
+			'return'         => 'objects',
 		);
-
-		$query = new WC_Order_Query( $args );
-		$pending_count = count( $query->get_posts() );
+		$query  = new WC_Order_Query( $args );
+		$orders = $query->get_orders();
+		$pending_count = is_array( $orders ) ? count( $orders ) : 0;
 
 		return array(
 			'pending' => $pending_count,

@@ -314,13 +314,17 @@ class OCPay_Settings {
 			// Preferred: wc_get_orders (HPOS compatible)
 			if ( function_exists( 'wc_get_orders' ) ) {
 				$args  = array(
-					'limit'    => -1,
-					'status'   => array( 'pending' ),
-					'return'   => 'ids',
-					// Filter by meta to ensure it's an OCPay order
-					'meta_key' => '_ocpay_payment_ref',
-					'orderby'  => 'date',
-					'order'    => 'DESC',
+					'limit'      => -1,
+					'status'     => array( 'pending' ),
+					'return'     => 'ids',
+					'meta_query' => array(
+						array(
+							'key'     => '_ocpay_payment_ref',
+							'compare' => 'EXISTS',
+						),
+					),
+					'orderby'    => 'date',
+					'order'      => 'DESC',
 				);
 				$orders = wc_get_orders( $args );
 				$result['count'] = is_array( $orders ) ? count( $orders ) : 0;

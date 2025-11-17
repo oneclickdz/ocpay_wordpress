@@ -37,6 +37,30 @@ if ( ! defined( 'OCPAY_WOOCOMMERCE_BASENAME' ) ) {
 	define( 'OCPAY_WOOCOMMERCE_BASENAME', plugin_basename( __FILE__ ) );
 }
 
+// Register custom cron schedule EARLY so activation scheduling works
+add_filter( 'cron_schedules', 'ocpay_register_cron_schedule', 5 );
+function ocpay_register_cron_schedule( $schedules ) {
+	if ( ! isset( $schedules['ocpay_every_20_minutes'] ) ) {
+		$schedules['ocpay_every_20_minutes'] = array(
+			'interval' => 20 * MINUTE_IN_SECONDS,
+			'display'  => esc_html__( 'Every 20 Minutes', 'ocpay-woocommerce' ),
+		);
+	}
+	return $schedules;
+}
+
+// Ensure cron event exists (helps if schedule failed on activation previously)
+add_action( 'plugins_loaded', 'ocpay_ensure_cron_event', 15 );
+function ocpay_ensure_cron_event() {
+	if ( ! wp_next_scheduled( 'wp_scheduled_event_ocpay_check_payment_status' ) ) {
+		// Delay first run by 60s to allow WooCommerce to finish loading
+		wp_schedule_event( time() + 60, 'ocpay_every_20_minutes', 'wp_scheduled_event_ocpay_check_payment_status' );
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( 'OCPay: Scheduled missing payment status cron event' );
+		}
+	}
+}
+
 // Declare HPOS compatibility early
 add_action( 'before_woocommerce_init', function() {
 	if ( class_exists( '\Automattic\WooCommerce\Utilities\FeaturesUtil' ) ) {
@@ -46,13 +70,10 @@ add_action( 'before_woocommerce_init', function() {
 
 // Register activation/deactivation hooks
 register_activation_hook( __FILE__, function() {
-	// Schedule status polling cron job - every 20 minutes
+	// Force cron schedule registration before scheduling
+	add_filter( 'cron_schedules', 'ocpay_register_cron_schedule', 5 );
 	if ( ! wp_next_scheduled( 'wp_scheduled_event_ocpay_check_payment_status' ) ) {
-		wp_schedule_event(
-			time(),
-			'ocpay_every_20_minutes',
-			'wp_scheduled_event_ocpay_check_payment_status'
-		);
+		wp_schedule_event( time() + 60, 'ocpay_every_20_minutes', 'wp_scheduled_event_ocpay_check_payment_status' );
 	}
 	update_option( 'ocpay_woocommerce_version', OCPAY_WOOCOMMERCE_VERSION );
 	update_option( 'ocpay_woocommerce_activated', current_time( 'mysql' ) );
@@ -410,17 +431,20 @@ class OCPay_WooCommerce {
 			}
 		}
 
-		// Trigger status check
+		// Trigger status check with robust error handling
 		if ( class_exists( 'OCPay_Status_Checker' ) ) {
 			try {
 				$checker = OCPay_Status_Checker::get_instance();
 				$checker->check_pending_payments();
-				
 				wp_send_json_success( array(
 					'message' => esc_html__( 'Payment status check completed. Check logs for details.', 'ocpay-woocommerce' ),
 				) );
-			} catch ( Exception $e ) {
-				wp_send_json_error( esc_html__( 'Error during status check: ', 'ocpay-woocommerce' ) . $e->getMessage() );
+			} catch ( \Throwable $e ) {
+				// Log error if logger available
+				if ( class_exists( 'OCPay_Logger' ) ) {
+					OCPay_Logger::get_instance()->error( 'Manual status check fatal error', array( 'error' => $e->getMessage() ) );
+				}
+				wp_send_json_error( sprintf( '%s %s', esc_html__( 'Error during status check:', 'ocpay-woocommerce' ), esc_html( $e->getMessage() ) ) );
 			}
 		} else {
 			wp_send_json_error( esc_html__( 'Status checker not available.', 'ocpay-woocommerce' ) );
