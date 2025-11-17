@@ -1221,6 +1221,38 @@ wp eval 'do_action("wp_scheduled_event_ocpay_check_payment_status");'
 wp plugin list --field=name --field=version | grep ocpay
 ```
 
+### Release Workflow
+
+The plugin includes an automated GitHub Actions workflow for version management and releases.
+
+#### How to Create a Release
+
+1. **Navigate to GitHub Actions**:
+   - Go to the repository on GitHub
+   - Click "Actions" tab
+   - Select "Release Plugin" workflow
+
+2. **Trigger the Workflow**:
+   - Click "Run workflow"
+   - Select version bump type:
+     - **patch**: Bug fixes (1.0.1 → 1.0.2)
+     - **minor**: New features (1.0.1 → 1.1.0)
+     - **major**: Breaking changes (1.0.1 → 2.0.0)
+
+3. **Workflow Process**:
+   - Automatically increments version in all files
+   - Commits version changes
+   - Creates git tag (e.g., v1.0.2)
+   - Builds plugin ZIP file (excluding dev files)
+   - Creates GitHub release with download link
+
+4. **Release Package**:
+   - Clean ZIP file with only production files
+   - Excludes: .git, .github, node_modules, tests, etc.
+   - Ready for WordPress plugin installation
+
+For detailed documentation, see [.github/WORKFLOW_DOCS.md](.github/WORKFLOW_DOCS.md).
+
 ---
 
 ## Changelog
