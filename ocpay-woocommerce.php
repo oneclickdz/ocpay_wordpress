@@ -3,7 +3,7 @@
  * Plugin Name: OCPay for WooCommerce
  * Plugin URI: https://oneclickdz.com
  * Description: Accept secure payments via OCPay powered by SATIM bank-grade security.
- * Version: 1.1.0
+ * Version: 1.2.0
  * Author: OneClick DZ
  * Author URI: https://oneclickdz.com
  * License: GPL v3 or later
@@ -31,7 +31,7 @@ if ( ! defined( 'OCPAY_WOOCOMMERCE_URL' ) ) {
 	define( 'OCPAY_WOOCOMMERCE_URL', plugin_dir_url( __FILE__ ) );
 }
 if ( ! defined( 'OCPAY_WOOCOMMERCE_VERSION' ) ) {
-	define( 'OCPAY_WOOCOMMERCE_VERSION', '1.1.0' );
+	define( 'OCPAY_WOOCOMMERCE_VERSION', '1.2.0' );
 }
 if ( ! defined( 'OCPAY_WOOCOMMERCE_BASENAME' ) ) {
 	define( 'OCPAY_WOOCOMMERCE_BASENAME', plugin_basename( __FILE__ ) );
