@@ -81,8 +81,8 @@ class OCPay_Payment_Gateway extends WC_Payment_Gateway {
 	 * @return void
 	 */
 	public function enqueue_scripts() {
-		// Only load on checkout page
-		if ( ! is_checkout() ) {
+		// Enqueue on checkout and order received pages
+		if ( ! is_checkout() && ! is_order_received_page() ) {
 			return;
 		}
 
@@ -112,6 +112,44 @@ class OCPay_Payment_Gateway extends WC_Payment_Gateway {
 				'gatewayDescription' => $this->description,
 			)
 		);
+
+		// On order received page, enqueue status poller for pending OCPay orders
+		if ( is_order_received_page() ) {
+			global $wp;
+			$order_id = isset( $wp->query_vars['order-received'] ) ? absint( $wp->query_vars['order-received'] ) : 0;
+			
+			if ( $order_id ) {
+				$order = wc_get_order( $order_id );
+				
+				// Only for pending OCPay orders
+				if ( $order && 
+					'ocpay' === $order->get_payment_method() && 
+					'pending' === $order->get_status() ) {
+					
+					// Enqueue status poller
+					wp_enqueue_script(
+						'ocpay-order-status-poller',
+						OCPAY_WOOCOMMERCE_URL . 'assets/js/order-status-poller.js',
+						array( 'jquery' ),
+						OCPAY_WOOCOMMERCE_VERSION,
+						true
+					);
+
+					// Localize poller config
+					wp_localize_script(
+						'ocpay-order-status-poller',
+						'ocpayPollerConfig',
+						array(
+							'orderId'     => $order_id,
+							'nonce'       => wp_create_nonce( 'ocpay_frontend_nonce' ),
+							'ajaxUrl'     => admin_url( 'admin-ajax.php' ),
+							'redirectUrl' => $order->get_view_order_url(),
+							'maxAttempts' => apply_filters( 'ocpay_poller_max_attempts', 40 ),
+						)
+					);
+				}
+			}
+		}
 	}
 
 	/**

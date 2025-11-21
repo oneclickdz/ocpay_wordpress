@@ -37,26 +37,60 @@ if ( ! defined( 'OCPAY_WOOCOMMERCE_BASENAME' ) ) {
 	define( 'OCPAY_WOOCOMMERCE_BASENAME', plugin_basename( __FILE__ ) );
 }
 
-// Register custom cron schedule EARLY so activation scheduling works
+// Register custom cron schedules EARLY so activation scheduling works
 add_filter( 'cron_schedules', 'ocpay_register_cron_schedule', 5 );
 function ocpay_register_cron_schedule( $schedules ) {
+	// Fast check for recent orders (every 5 minutes)
+	if ( ! isset( $schedules['ocpay_every_5_minutes'] ) ) {
+		$schedules['ocpay_every_5_minutes'] = array(
+			'interval' => 5 * MINUTE_IN_SECONDS,
+			'display'  => esc_html__( 'Every 5 Minutes', 'ocpay-woocommerce' ),
+		);
+	}
+	
+	// Standard check for all pending orders (every 20 minutes)
 	if ( ! isset( $schedules['ocpay_every_20_minutes'] ) ) {
 		$schedules['ocpay_every_20_minutes'] = array(
 			'interval' => 20 * MINUTE_IN_SECONDS,
 			'display'  => esc_html__( 'Every 20 Minutes', 'ocpay-woocommerce' ),
 		);
 	}
+	
+	// Check for stuck orders (every 30 minutes)
+	if ( ! isset( $schedules['ocpay_every_30_minutes'] ) ) {
+		$schedules['ocpay_every_30_minutes'] = array(
+			'interval' => 30 * MINUTE_IN_SECONDS,
+			'display'  => esc_html__( 'Every 30 Minutes', 'ocpay-woocommerce' ),
+		);
+	}
+	
 	return $schedules;
 }
 
-// Ensure cron event exists (helps if schedule failed on activation previously)
-add_action( 'plugins_loaded', 'ocpay_ensure_cron_event', 15 );
-function ocpay_ensure_cron_event() {
+// Ensure cron events exist (helps if schedule failed on activation previously)
+add_action( 'plugins_loaded', 'ocpay_ensure_cron_events', 15 );
+function ocpay_ensure_cron_events() {
+	// Main check every 20 minutes
 	if ( ! wp_next_scheduled( 'wp_scheduled_event_ocpay_check_payment_status' ) ) {
-		// Delay first run by 60s to allow WooCommerce to finish loading
 		wp_schedule_event( time() + 60, 'ocpay_every_20_minutes', 'wp_scheduled_event_ocpay_check_payment_status' );
 		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-			error_log( 'OCPay: Scheduled missing payment status cron event' );
+			error_log( 'OCPay: Scheduled main payment status cron event (20 min)' );
+		}
+	}
+	
+	// Recent orders check every 5 minutes
+	if ( ! wp_next_scheduled( 'ocpay_check_recent_orders' ) ) {
+		wp_schedule_event( time() + 120, 'ocpay_every_5_minutes', 'ocpay_check_recent_orders' );
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( 'OCPay: Scheduled recent orders cron event (5 min)' );
+		}
+	}
+	
+	// Stuck orders check every 30 minutes
+	if ( ! wp_next_scheduled( 'ocpay_check_stuck_orders' ) ) {
+		wp_schedule_event( time() + 180, 'ocpay_every_30_minutes', 'ocpay_check_stuck_orders' );
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( 'OCPay: Scheduled stuck orders cron event (30 min)' );
 		}
 	}
 }
@@ -72,16 +106,30 @@ add_action( 'before_woocommerce_init', function() {
 register_activation_hook( __FILE__, function() {
 	// Force cron schedule registration before scheduling
 	add_filter( 'cron_schedules', 'ocpay_register_cron_schedule', 5 );
+	
+	// Schedule all cron events
 	if ( ! wp_next_scheduled( 'wp_scheduled_event_ocpay_check_payment_status' ) ) {
 		wp_schedule_event( time() + 60, 'ocpay_every_20_minutes', 'wp_scheduled_event_ocpay_check_payment_status' );
 	}
+	
+	if ( ! wp_next_scheduled( 'ocpay_check_recent_orders' ) ) {
+		wp_schedule_event( time() + 120, 'ocpay_every_5_minutes', 'ocpay_check_recent_orders' );
+	}
+	
+	if ( ! wp_next_scheduled( 'ocpay_check_stuck_orders' ) ) {
+		wp_schedule_event( time() + 180, 'ocpay_every_30_minutes', 'ocpay_check_stuck_orders' );
+	}
+	
 	update_option( 'ocpay_woocommerce_version', OCPAY_WOOCOMMERCE_VERSION );
 	update_option( 'ocpay_woocommerce_activated', current_time( 'mysql' ) );
 	flush_rewrite_rules();
 } );
 
 register_deactivation_hook( __FILE__, function() {
+	// Clear all scheduled cron events
 	wp_clear_scheduled_hook( 'wp_scheduled_event_ocpay_check_payment_status' );
+	wp_clear_scheduled_hook( 'ocpay_check_recent_orders' );
+	wp_clear_scheduled_hook( 'ocpay_check_stuck_orders' );
 	flush_rewrite_rules();
 } );
 

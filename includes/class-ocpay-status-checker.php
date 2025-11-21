@@ -72,10 +72,19 @@ class OCPay_Status_Checker {
 		// Initialize API client
 		$this->init_api_client();
 
-		// Hooks
+		// Hooks for multiple cron schedules
 		add_action( 'wp_scheduled_event_ocpay_check_payment_status', array( $this, 'check_pending_payments' ) );
+		add_action( 'ocpay_check_recent_orders', array( $this, 'check_recent_orders' ) );
+		add_action( 'ocpay_check_stuck_orders', array( $this, 'check_stuck_orders' ) );
+		
+		// AJAX handlers
 		add_action( 'wp_ajax_ocpay_check_payment_status', array( $this, 'ajax_check_payment_status' ) );
+		add_action( 'wp_ajax_nopriv_ocpay_check_payment_status', array( $this, 'ajax_check_payment_status' ) );
+		
+		// Fallback checks
 		add_action( 'woocommerce_view_order', array( $this, 'check_status_on_order_view' ), 10, 1 );
+		add_action( 'woocommerce_thankyou', array( $this, 'check_status_on_thankyou' ), 10, 1 );
+		add_action( 'woocommerce_order_details_before_order_table', array( $this, 'check_status_on_order_details' ), 10, 1 );
 	}
 
 	/**
@@ -119,6 +128,9 @@ class OCPay_Status_Checker {
 	 * @return void
 	 */
 	public function check_pending_payments() {
+		// Track last run
+		update_option( 'ocpay_last_cron_run_wp_scheduled_event_ocpay_check_payment_status', current_time( 'mysql' ) );
+		
 		// Reinitialize API client on each run to ensure fresh credentials
 		$this->init_api_client();
 
@@ -471,6 +483,173 @@ class OCPay_Status_Checker {
 
 		// Check status silently
 		$this->check_order_payment_status( $order_id );
+	}
+
+	/**
+	 * Check recent orders (last 30 minutes) - runs every 5 minutes
+	 *
+	 * More frequent checking for newly created orders
+	 *
+	 * @return void
+	 */
+	public function check_recent_orders() {
+		// Track last run
+		update_option( 'ocpay_last_cron_run_ocpay_check_recent_orders', current_time( 'mysql' ) );
+		
+		$this->logger->info( 'Starting recent orders check (last 30 min)' );
+
+		// Reinitialize API client
+		$this->init_api_client();
+
+		if ( ! $this->api_client ) {
+			$this->logger->error( 'Cannot check recent orders: API client not initialized' );
+			return;
+		}
+
+		// Get orders from last 30 minutes
+		$date_threshold = gmdate( 'Y-m-d H:i:s', strtotime( '-30 minutes' ) );
+
+		$args = array(
+			'limit'          => 20,
+			'status'         => array( 'pending' ),
+			'payment_method' => 'ocpay',
+			'date_created'   => '>=' . $date_threshold,
+			'meta_query'     => array(
+				array(
+					'key'     => '_ocpay_payment_ref',
+					'compare' => 'EXISTS',
+				),
+			),
+			'orderby'        => 'date',
+			'order'          => 'DESC',
+			'return'         => 'objects',
+		);
+
+		$query  = new WC_Order_Query( $args );
+		$orders = $query->get_orders();
+
+		if ( empty( $orders ) ) {
+			$this->logger->info( 'No recent pending orders to check' );
+			return;
+		}
+
+		$this->logger->info( 'Found recent pending orders', array( 'count' => count( $orders ) ) );
+
+		$checked = 0;
+		$updated = 0;
+
+		foreach ( $orders as $order ) {
+			$result = $this->check_order_payment_status( $order->get_id() );
+			$checked++;
+
+			if ( $result ) {
+				$updated++;
+			}
+		}
+
+		$this->logger->info( 'Recent orders check completed', array(
+			'checked' => $checked,
+			'updated' => $updated,
+		) );
+	}
+
+	/**
+	 * Check stuck orders (pending > 1 hour but < 24 hours) - runs every 30 minutes
+	 *
+	 * @return void
+	 */
+	public function check_stuck_orders() {
+		// Track last run
+		update_option( 'ocpay_last_cron_run_ocpay_check_stuck_orders', current_time( 'mysql' ) );
+		
+		$this->logger->info( 'Starting stuck orders check' );
+
+		// Reinitialize API client
+		$this->init_api_client();
+
+		if ( ! $this->api_client ) {
+			$this->logger->error( 'Cannot check stuck orders: API client not initialized' );
+			return;
+		}
+
+		// Get orders between 1 hour and 24 hours old
+		$date_start = gmdate( 'Y-m-d H:i:s', strtotime( '-24 hours' ) );
+		$date_end   = gmdate( 'Y-m-d H:i:s', strtotime( '-1 hour' ) );
+
+		$args = array(
+			'limit'          => 50,
+			'status'         => array( 'pending' ),
+			'payment_method' => 'ocpay',
+			'date_created'   => $date_start . '...' . $date_end,
+			'meta_query'     => array(
+				array(
+					'key'     => '_ocpay_payment_ref',
+					'compare' => 'EXISTS',
+				),
+			),
+			'orderby'        => 'date',
+			'order'          => 'ASC',
+			'return'         => 'objects',
+		);
+
+		$query  = new WC_Order_Query( $args );
+		$orders = $query->get_orders();
+
+		if ( empty( $orders ) ) {
+			$this->logger->info( 'No stuck orders to check' );
+			return;
+		}
+
+		$this->logger->info( 'Found stuck orders', array( 'count' => count( $orders ) ) );
+
+		$checked = 0;
+		$updated = 0;
+
+		foreach ( $orders as $order ) {
+			$result = $this->check_order_payment_status( $order->get_id() );
+			$checked++;
+
+			if ( $result ) {
+				$updated++;
+			}
+		}
+
+		$this->logger->info( 'Stuck orders check completed', array(
+			'checked' => $checked,
+			'updated' => $updated,
+		) );
+	}
+
+	/**
+	 * Check status on thank you page
+	 *
+	 * @param int $order_id Order ID.
+	 * @return void
+	 */
+	public function check_status_on_thankyou( $order_id ) {
+		$order = wc_get_order( $order_id );
+
+		if ( ! $order || 'pending' !== $order->get_status() || 'ocpay' !== $order->get_payment_method() ) {
+			return;
+		}
+
+		// Check immediately (non-blocking)
+		$this->check_order_payment_status( $order_id );
+	}
+
+	/**
+	 * Check status on order details page
+	 *
+	 * @param WC_Order $order Order object.
+	 * @return void
+	 */
+	public function check_status_on_order_details( $order ) {
+		if ( ! $order || 'pending' !== $order->get_status() || 'ocpay' !== $order->get_payment_method() ) {
+			return;
+		}
+
+		// Check silently
+		$this->check_order_payment_status( $order->get_id() );
 	}
 
 	/**

@@ -321,6 +321,14 @@ class OCPay_Order_Handler {
 	 * @return void
 	 */
 	private function display_payment_return( $order, $status ) {
+		// If pending, redirect to thank you page with polling
+		if ( 'pending' === $status ) {
+			$redirect_url = $order->get_checkout_order_received_url();
+			wp_safe_redirect( $redirect_url );
+			exit;
+		}
+
+		// For success/failed, show immediate result then redirect
 		// Ensure we're in WordPress environment
 		if ( ! function_exists( 'get_header' ) ) {
 			wp_die( esc_html__( 'Cannot display page.', 'ocpay-woocommerce' ) );
