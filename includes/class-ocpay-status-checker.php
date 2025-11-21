@@ -105,8 +105,10 @@ class OCPay_Status_Checker {
 	 * @return bool True if API client is initialized, false otherwise
 	 */
 	private function ensure_api_client() {
-		// Reinitialize API client to ensure fresh credentials
-		$this->init_api_client();
+		// Only reinitialize if not already initialized
+		if ( ! $this->api_client ) {
+			$this->init_api_client();
+		}
 
 		if ( ! $this->api_client ) {
 			$this->logger->error( 'Cannot check payment status: API client not initialized' );
@@ -233,6 +235,10 @@ class OCPay_Status_Checker {
 			$this->logger->warning( 'No payment reference found for order', array( 'order_id' => $order_id ) );
 			return false;
 		}
+
+		// Note: We no longer check order age (previously limited to 24 hours)
+		// With on-demand checking, we check whenever requested regardless of age
+		// This allows customers to complete payment at any time
 
 		$this->logger->debug( 'Checking payment status for order', array(
 			'order_id'    => $order_id,

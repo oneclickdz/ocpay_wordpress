@@ -48,8 +48,12 @@ add_action( 'before_woocommerce_init', function() {
 
 // Register activation/deactivation hooks
 register_activation_hook( __FILE__, function() {
-	// Clear any old cron events from previous version
-	wp_clear_scheduled_hook( 'wp_scheduled_event_ocpay_check_payment_status' );
+	// Clear any old cron events from previous versions (only on upgrade)
+	$old_version = get_option( 'ocpay_woocommerce_version' );
+	if ( $old_version && version_compare( $old_version, '1.2.1', '<' ) ) {
+		// Upgrading from older version that used cron
+		wp_clear_scheduled_hook( 'wp_scheduled_event_ocpay_check_payment_status' );
+	}
 	update_option( 'ocpay_woocommerce_version', OCPAY_WOOCOMMERCE_VERSION );
 	update_option( 'ocpay_woocommerce_activated', current_time( 'mysql' ) );
 	flush_rewrite_rules();
