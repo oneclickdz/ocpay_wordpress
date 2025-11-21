@@ -125,15 +125,21 @@ if ( 'test_polling' === $action ) {
     }
 }
 
-// Test 6: Cron schedule check
-echo '<h2>6. WordPress Cron Schedule</h2>';
+// Test 6: Status checking approach
+echo '<h2>6. Status Checking Method</h2>';
+echo '<p style="color: blue;">ℹ Using simplified on-demand status checking</p>';
+echo '<p>Status is checked when:</p>';
+echo '<ul>';
+echo '<li>Customer returns to thank you page</li>';
+echo '<li>Customer views order page</li>';
+echo '<li>Admin manually triggers check</li>';
+echo '</ul>';
+echo '<p>No background cron polling is used - this simplifies the plugin and reduces server load.</p>';
+
 $next_event = wp_next_scheduled( 'wp_scheduled_event_ocpay_check_payment_status' );
 if ( $next_event ) {
-    echo '<p style="color: green;">✓ OCPay cron event scheduled</p>';
+    echo '<p style="color: orange;">⚠ Old cron event still exists (will be cleaned up)</p>';
     echo '<p>Next execution: ' . wp_date( 'Y-m-d H:i:s', $next_event ) . '</p>';
-} else {
-    echo '<p style="color: red;">✗ OCPay cron event NOT scheduled</p>';
-    echo '<p>To reschedule, deactivate and reactivate the plugin</p>';
 }
 
 // Test 7: Logger check

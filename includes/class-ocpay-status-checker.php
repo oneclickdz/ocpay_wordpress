@@ -133,6 +133,69 @@ class OCPay_Status_Checker {
 		$this->check_order_payment_status( $order_id );
 	}
 
+	/**
+	 * Manual check of all pending payments (called from admin)
+	 * 
+	 * This is for backward compatibility with the admin manual check button
+	 *
+	 * @return void
+	 */
+	public function check_pending_payments() {
+		// Reinitialize API client to ensure fresh credentials
+		$this->init_api_client();
+
+		if ( ! $this->api_client ) {
+			$this->logger->error( 'Cannot check pending payments: API client not initialized' );
+			return;
+		}
+
+		$this->logger->info( 'Starting manual payment status check' );
+
+		// Get recent pending orders (limit to 50 for manual check)
+		$args = array(
+			'limit'          => 50,
+			'status'         => array( 'pending' ),
+			'payment_method' => 'ocpay',
+			'meta_query'     => array(
+				array(
+					'key'     => '_ocpay_payment_ref',
+					'compare' => 'EXISTS',
+				),
+			),
+			'orderby'        => 'date',
+			'order'          => 'DESC',
+			'return'         => 'ids',
+		);
+
+		$query     = new WC_Order_Query( $args );
+		$order_ids = $query->get_orders();
+
+		if ( empty( $order_ids ) ) {
+			$this->logger->info( 'No pending OCPay orders to check' );
+			return;
+		}
+
+		$this->logger->info( 'Found pending orders to check', array( 'count' => count( $order_ids ) ) );
+
+		// Check each order
+		$checked = 0;
+		$updated = 0;
+
+		foreach ( $order_ids as $order_id ) {
+			$result = $this->check_order_payment_status( $order_id );
+			$checked++;
+
+			if ( $result ) {
+				$updated++;
+			}
+		}
+
+		$this->logger->info( 'Manual payment status check completed', array(
+			'checked' => $checked,
+			'updated' => $updated,
+		) );
+	}
+
 
 
 	/**

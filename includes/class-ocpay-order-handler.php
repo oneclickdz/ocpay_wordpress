@@ -58,7 +58,6 @@ class OCPay_Order_Handler {
 		);
 
 		// Hooks
-		add_action( 'wp_scheduled_event_ocpay_check_payment_status', array( $this, 'check_pending_payments' ) );
 		add_action( 'woocommerce_api_ocpay_return', array( $this, 'handle_payment_return' ) );
 	}
 
