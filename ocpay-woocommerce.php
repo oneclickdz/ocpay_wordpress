@@ -37,21 +37,9 @@ if ( ! defined( 'OCPAY_WOOCOMMERCE_BASENAME' ) ) {
 	define( 'OCPAY_WOOCOMMERCE_BASENAME', plugin_basename( __FILE__ ) );
 }
 
-// Register 1-minute cron schedule for active pending payments
-add_filter( 'cron_schedules', 'ocpay_register_1min_schedule', 5 );
-function ocpay_register_1min_schedule( $schedules ) {
-	if ( ! isset( $schedules['every_minute'] ) ) {
-		$schedules['every_minute'] = array(
-			'interval' => 60, // 1 minute
-			'display'  => esc_html__( 'Every Minute', 'ocpay-woocommerce' ),
-		);
-	}
-	return $schedules;
-}
-
-// Handler for 1-minute polling (only runs when there are pending payments)
-add_action( 'ocpay_check_pending_payments_1min', 'ocpay_handle_1min_polling' );
-function ocpay_handle_1min_polling() {
+// Handler for 1-minute polling using WooCommerce Action Scheduler
+add_action( 'ocpay_check_pending_payments', 'ocpay_handle_pending_payment_check' );
+function ocpay_handle_pending_payment_check() {
 	if ( ! class_exists( 'OCPay_Status_Checker' ) || ! class_exists( 'WC_Order_Query' ) ) {
 		return;
 	}
@@ -66,14 +54,74 @@ function ocpay_handle_1min_polling() {
 		'return'         => 'ids',
 	) );
 
-	// If no pending orders, stop polling
-	if ( empty( $query->get_orders() ) ) {
-		wp_clear_scheduled_hook( 'ocpay_check_pending_payments_1min' );
+	$pending_orders = $query->get_orders();
+
+	// If no pending orders, stop scheduling
+	if ( empty( $pending_orders ) ) {
+		// Clear all scheduled actions
+		if ( function_exists( 'as_unschedule_all_actions' ) ) {
+			as_unschedule_all_actions( 'ocpay_check_pending_payments' );
+		}
+		wp_clear_scheduled_hook( 'ocpay_check_pending_payments' );
 		return;
 	}
 
 	// Check all pending payments
 	OCPay_Status_Checker::get_instance()->check_pending_payments();
+
+	// Schedule next check in 1 minute if not already scheduled
+	if ( function_exists( 'as_next_scheduled_action' ) ) {
+		if ( ! as_next_scheduled_action( 'ocpay_check_pending_payments' ) ) {
+			as_schedule_single_action( time() + 60, 'ocpay_check_pending_payments' );
+		}
+	} elseif ( ! wp_next_scheduled( 'ocpay_check_pending_payments' ) ) {
+		// Fallback to wp-cron
+		wp_schedule_single_event( time() + 60, 'ocpay_check_pending_payments' );
+	}
+}
+
+// Ensure polling is active when there are pending payments (runs on admin pages)
+add_action( 'admin_init', 'ocpay_ensure_polling_active' );
+function ocpay_ensure_polling_active() {
+	// Only check every 5 minutes to avoid overhead
+	$last_check = get_transient( 'ocpay_last_polling_check' );
+	if ( $last_check ) {
+		return;
+	}
+	set_transient( 'ocpay_last_polling_check', true, 300 ); // 5 minutes
+
+	if ( ! class_exists( 'WC_Order_Query' ) ) {
+		return;
+	}
+
+	// Check if there are pending orders
+	$query = new WC_Order_Query( array(
+		'limit'          => 1,
+		'status'         => 'pending',
+		'payment_method' => 'ocpay',
+		'date_created'   => '>=' . strtotime( '-30 days' ),
+		'meta_query'     => array( array( 'key' => '_ocpay_payment_ref', 'compare' => 'EXISTS' ) ),
+		'return'         => 'ids',
+	) );
+
+	if ( ! empty( $query->get_orders() ) ) {
+		// There are pending orders, ensure polling is scheduled
+		$is_scheduled = false;
+		if ( function_exists( 'as_next_scheduled_action' ) ) {
+			$is_scheduled = as_next_scheduled_action( 'ocpay_check_pending_payments' ) !== false;
+		} else {
+			$is_scheduled = wp_next_scheduled( 'ocpay_check_pending_payments' ) !== false;
+		}
+
+		// If not scheduled, schedule it now
+		if ( ! $is_scheduled ) {
+			if ( function_exists( 'as_schedule_single_action' ) ) {
+				as_schedule_single_action( time() + 60, 'ocpay_check_pending_payments' );
+			} else {
+				wp_schedule_single_event( time() + 60, 'ocpay_check_pending_payments' );
+			}
+		}
+	}
 }
 
 // Declare HPOS compatibility early
@@ -97,9 +145,16 @@ register_activation_hook( __FILE__, function() {
 } );
 
 register_deactivation_hook( __FILE__, function() {
-	// Clear any scheduled events
+	// Clear wp-cron scheduled events
 	wp_clear_scheduled_hook( 'wp_scheduled_event_ocpay_check_payment_status' );
 	wp_clear_scheduled_hook( 'ocpay_check_pending_payments_1min' );
+	wp_clear_scheduled_hook( 'ocpay_check_pending_payments' );
+	
+	// Clear Action Scheduler actions if available
+	if ( function_exists( 'as_unschedule_all_actions' ) ) {
+		as_unschedule_all_actions( 'ocpay_check_pending_payments' );
+	}
+	
 	flush_rewrite_rules();
 } );
 
