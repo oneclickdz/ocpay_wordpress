@@ -139,9 +139,14 @@ class OCPay_Status_Checker {
 	 * Check all pending payments
 	 */
 	public function check_pending_payments() {
+		$this->logger->info( '[STATUS_CHECKER] check_pending_payments() called' );
+		
 		if ( ! $this->ensure_api_client() ) {
+			$this->logger->error( '[STATUS_CHECKER] API client not available' );
 			return;
 		}
+		
+		$this->logger->info( '[STATUS_CHECKER] API client verified, querying orders...' );
 
 		$query = new WC_Order_Query( array(
 			'limit'          => apply_filters( 'ocpay_manual_check_limit', 50 ),
@@ -152,10 +157,17 @@ class OCPay_Status_Checker {
 			'order'          => 'DESC',
 			'return'         => 'ids',
 		) );
+		
+		$order_ids = $query->get_orders();
+		$count = is_array( $order_ids ) ? count( $order_ids ) : 0;
+		$this->logger->info( "[STATUS_CHECKER] Found {$count} pending orders to check", array( 'order_ids' => $order_ids ) );
 
-		foreach ( $query->get_orders() as $order_id ) {
+		foreach ( $order_ids as $order_id ) {
+			$this->logger->info( "[STATUS_CHECKER] Checking order #{$order_id}" );
 			$this->check_order_payment_status( $order_id );
 		}
+		
+		$this->logger->info( '[STATUS_CHECKER] check_pending_payments() completed' );
 	}
 
 
@@ -167,15 +179,30 @@ class OCPay_Status_Checker {
 	 * @return bool True if order was updated
 	 */
 	public function check_order_payment_status( $order_id ) {
+		$this->logger->info( "  [ORDER #{$order_id}] Starting status check" );
+		
 		// Verify this is an OCPay order
 		$order = wc_get_order( $order_id );
 		
-		if ( ! $order || 'ocpay' !== $order->get_payment_method() ) {
+		if ( ! $order ) {
+			$this->logger->error( "  [ORDER #{$order_id}] Order not found" );
+			return false;
+		}
+		
+		$payment_method = $order->get_payment_method();
+		$this->logger->info( "  [ORDER #{$order_id}] Payment method: {$payment_method}" );
+		
+		if ( 'ocpay' !== $payment_method ) {
+			$this->logger->info( "  [ORDER #{$order_id}] Not OCPay order, skipping" );
 			return false;
 		}
 
 		// Skip if already completed or failed
-		if ( in_array( $order->get_status(), array( 'completed', 'processing', 'failed', 'cancelled' ), true ) ) {
+		$status = $order->get_status();
+		$this->logger->info( "  [ORDER #{$order_id}] Current status: {$status}" );
+		
+		if ( in_array( $status, array( 'completed', 'processing', 'failed', 'cancelled' ), true ) ) {
+			$this->logger->info( "  [ORDER #{$order_id}] Already finalized, skipping" );
 			return false;
 		}
 
@@ -183,25 +210,23 @@ class OCPay_Status_Checker {
 		$payment_ref = $order->get_meta( '_ocpay_payment_ref' );
 		
 		if ( ! $payment_ref ) {
-			$this->logger->warning( 'No payment reference found for order', array( 'order_id' => $order_id ) );
+			$this->logger->warning( "  [ORDER #{$order_id}] No payment reference found" );
 			return false;
 		}
+		
+		$this->logger->info( "  [ORDER #{$order_id}] Payment ref: {$payment_ref}" );
 
 		// Check order age - skip if older than 30 days to prevent unnecessary API calls
 		$order_date = $order->get_date_created();
 		$age_days = ( time() - $order_date->getTimestamp() ) / DAY_IN_SECONDS;
+		$this->logger->info( "  [ORDER #{$order_id}] Age: " . round( $age_days, 2 ) . " days" );
+		
 		if ( $age_days > 30 ) {
-			$this->logger->debug( 'Skipping old pending order', array(
-				'order_id'  => $order_id,
-				'age_days' => round( $age_days, 1 ),
-			) );
+			$this->logger->info( "  [ORDER #{$order_id}] Too old (>30 days), skipping" );
 			return false;
 		}
 
-		$this->logger->debug( 'Checking payment status for order', array(
-			'order_id'    => $order_id,
-			'payment_ref' => $payment_ref,
-		) );
+		$this->logger->info( "  [ORDER #{$order_id}] Calling API to check status..." );
 
 		// Initialize API client if not already done
 		if ( ! $this->api_client ) {

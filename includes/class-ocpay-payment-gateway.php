@@ -405,8 +405,9 @@ class OCPay_Payment_Gateway extends WC_Payment_Gateway {
 	 * @return void
 	 */
 	private function schedule_payment_polling() {
+		$this->logger->info( '>>> CALLING ocpay_start_payment_polling() <<<' );
 		ocpay_start_payment_polling();
-		$this->logger->info( 'Started background payment polling' );
+		$this->logger->info( '>>> ocpay_start_payment_polling() RETURNED <<<' );
 	}
 
 	/**

@@ -39,30 +39,56 @@ if ( ! defined( 'OCPAY_WOOCOMMERCE_BASENAME' ) ) {
 
 // Background polling with debounce - uses sleep, no cron/scheduling
 function ocpay_start_payment_polling() {
+	$logger = OCPay_Logger::get_instance();
+	$logger->info( '=== POLLING START === Function called' );
+	
 	// Debounce: Check if already running
 	$is_running = get_transient( 'ocpay_polling_running' );
+	$logger->info( 'Debounce check', array( 'is_running' => $is_running ? 'YES' : 'NO' ) );
+	
 	if ( $is_running ) {
+		$logger->info( '=== POLLING SKIPPED === Already running' );
 		return; // Already running, skip
 	}
 
 	// Set running flag (expires in 5 minutes as safety)
 	set_transient( 'ocpay_polling_running', true, 300 );
+	$logger->info( 'Set running flag (5 min expiry)' );
 
 	// Run in background without blocking response
 	if ( function_exists( 'fastcgi_finish_request' ) ) {
 		fastcgi_finish_request();
+		$logger->info( 'Called fastcgi_finish_request()' );
+	} else {
+		$logger->info( 'fastcgi_finish_request() NOT available' );
 	}
 
+	$loop_count = 0;
+	$logger->info( '=== ENTERING LOOP ===' );
+	
 	// Loop: check pending, sleep 60s, repeat until no pending
 	while ( true ) {
-		if ( ! class_exists( 'OCPay_Status_Checker' ) || ! class_exists( 'WC_Order_Query' ) ) {
+		$loop_count++;
+		$logger->info( "--- Loop iteration #{$loop_count} ---" );
+		
+		if ( ! class_exists( 'OCPay_Status_Checker' ) ) {
+			$logger->error( 'OCPay_Status_Checker class not found - BREAKING' );
+			break;
+		}
+		
+		if ( ! class_exists( 'WC_Order_Query' ) ) {
+			$logger->error( 'WC_Order_Query class not found - BREAKING' );
 			break;
 		}
 
+		$logger->info( 'Classes verified, checking pending payments...' );
+		
 		// Check all pending payments
 		OCPay_Status_Checker::get_instance()->check_pending_payments();
+		$logger->info( 'check_pending_payments() completed' );
 
 		// Check if still have pending orders
+		$logger->info( 'Querying for pending orders...' );
 		$query = new WC_Order_Query( array(
 			'limit'          => 1,
 			'status'         => 'pending',
@@ -71,18 +97,29 @@ function ocpay_start_payment_polling() {
 			'meta_query'     => array( array( 'key' => '_ocpay_payment_ref', 'compare' => 'EXISTS' ) ),
 			'return'         => 'ids',
 		) );
+		
+		$pending_orders = $query->get_orders();
+		$pending_count = is_array( $pending_orders ) ? count( $pending_orders ) : 0;
+		$logger->info( 'Pending orders check', array( 
+			'count' => $pending_count,
+			'orders' => $pending_orders 
+		) );
 
 		// No pending orders? Stop loop
-		if ( empty( $query->get_orders() ) ) {
+		if ( empty( $pending_orders ) ) {
+			$logger->info( '=== NO PENDING ORDERS - STOPPING LOOP ===' );
 			break;
 		}
 
+		$logger->info( "Sleeping 60 seconds before iteration #{$loop_count} check..." );
 		// Sleep 60 seconds before next check
 		sleep( 60 );
+		$logger->info( 'Woke up from sleep, continuing loop' );
 	}
 
 	// Clear running flag
 	delete_transient( 'ocpay_polling_running' );
+	$logger->info( '=== POLLING END === Cleared running flag, total loops: ' . $loop_count );
 }
 
 // Declare HPOS compatibility early
