@@ -400,26 +400,14 @@ class OCPay_Payment_Gateway extends WC_Payment_Gateway {
 	}
 
 	/**
-	 * Schedule 1-minute polling for pending payments
-	 * 
-	 * Uses WooCommerce Action Scheduler for reliable execution
+	 * Schedule simple self-calling check (like setTimeout)
 	 *
 	 * @return void
 	 */
 	private function schedule_payment_polling() {
-		// Use WooCommerce Action Scheduler if available (more reliable than wp-cron)
-		if ( function_exists( 'as_next_scheduled_action' ) ) {
-			// Only schedule if not already scheduled
-			if ( ! as_next_scheduled_action( 'ocpay_check_pending_payments' ) ) {
-				as_schedule_single_action( time() + 60, 'ocpay_check_pending_payments' );
-				$this->logger->info( 'Scheduled payment polling via Action Scheduler' );
-			}
-		} else {
-			// Fallback to wp-cron if Action Scheduler not available
-			if ( ! wp_next_scheduled( 'ocpay_check_pending_payments' ) ) {
-				wp_schedule_single_event( time() + 60, 'ocpay_check_pending_payments' );
-				$this->logger->info( 'Scheduled payment polling via wp-cron' );
-			}
+		if ( ! wp_next_scheduled( 'ocpay_check_pending_payments' ) ) {
+			wp_schedule_single_event( time() + 60, 'ocpay_check_pending_payments' );
+			$this->logger->info( 'Scheduled payment check in 60s' );
 		}
 	}
 
