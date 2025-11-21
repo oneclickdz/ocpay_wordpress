@@ -95,10 +95,11 @@
    - Failed payments marked as "On Hold" for manual review
    - Automatic order status updates via payment confirmation
 
-3. **Automatic Status Polling**
-   - Checks payment status every 20 minutes (cron job)
-   - Manual check available via customer order page
-   - AJAX-based real-time status verification
+3. **Simple On-Demand Status Checking**
+   - Checks payment status when customer returns to site
+   - Status refreshed when viewing order page
+   - Manual check available for admins (up to 50 orders)
+   - No background cron jobs - simpler and more efficient
 
 4. **WooCommerce Blocks Support**
    - Compatible with latest WooCommerce block checkout
@@ -274,80 +275,70 @@ PENDING → Continue polling
 
 ---
 
-## Status Polling
+## Status Checking
 
 ### Overview
 
-OCPay payments require asynchronous confirmation through the SATIM banking system. The plugin implements automated status polling to check payment confirmation without manual intervention.
+OCPay payments require asynchronous confirmation through the SATIM banking system. The plugin implements simple on-demand status checking to verify payment confirmation when customers interact with their orders.
 
-### Polling Methods
+### Checking Methods
 
-#### 1. Automatic Polling (Cron Job)
+#### 1. Thank You Page Check (Automatic)
 
-**Trigger**: Every 20 minutes (configurable)
+**Trigger**: When customer returns from OCPay payment page
 
 **What Checks**:
-- All pending orders with OCPay payment method
-- Orders with valid payment reference
-- Orders created within last 24 hours
-- Maximum 100 orders per run (prevents overload)
+- The specific order that was just paid
 
 **Process**:
-1. Cron job executes automatically
-2. Plugin retrieves pending OCPay orders
-3. Calls OCPay API for each order's payment status
-4. Updates orders based on response
-5. Logs all activities
-
-**Benefits**:
-- Completely automatic
-- No customer action required
-- Catches payment confirmations during off-hours
-- Distributed load with 20-minute intervals
-
-**Configuration**:
-- Set in `wp_scheduled_event_ocpay_check_payment_status`
-- Schedule: Every 20 minutes
-- Can be modified by advanced users
-
-#### 2. Manual Polling (Customer Order Page)
-
-**Trigger**: When customer views order page (automatic) or clicks "Check Payment" button (manual)
-
-**Process**:
-1. Customer views order page
-2. Plugin automatically checks payment status once
-3. If payment confirmed, order is updated
-4. Customer sees updated status
+1. Customer completes payment at OCPay
+2. Customer is redirected to thank you page
+3. Plugin automatically checks payment status via API
+4. Order is updated if payment confirmed
+5. Customer sees immediate result
 
 **Benefits**:
 - Immediate feedback to customer
-- Customer can manually refresh status
-- No need to wait for next cron cycle
+- No waiting required
+- Happens automatically on return
 
-**Implementation**:
-```javascript
-// Add check button to order page
-<button id="check-payment">Check Payment Status</button>
+**Hook**: `woocommerce_thankyou`
 
-// Sends AJAX request with nonce
-wp_ajax_ocpay_check_payment_status
-```
+#### 2. Order View Page Check (Automatic)
 
-#### 3. Return Callback (from OCPay)
-
-**Trigger**: When customer clicks return link from OCPay
+**Trigger**: When customer or admin views an order page
 
 **Process**:
-1. OCPay redirects customer back to store
-2. Plugin receives payment reference in URL
-3. Immediately checks payment status with API
-4. Updates order if confirmed
-5. Displays appropriate message (success/failed/pending)
+1. Customer/admin views order page
+2. Plugin checks if order is still pending
+3. If pending, checks payment status via API
+4. Order is updated if payment confirmed
+5. Page shows updated status
 
 **Benefits**:
-- Immediate update on payment completion
-- Customer notified right away
+- Status refreshed every time order is viewed
+- No manual intervention needed
+- Works for both customers and admins
+
+**Hook**: `woocommerce_view_order`
+
+#### 3. Manual Admin Check
+
+**Trigger**: Admin clicks "Manual Check" button in settings
+
+**Process**:
+1. Admin triggers manual check
+2. Plugin retrieves up to 50 most recent pending orders
+3. Checks payment status for each via API
+4. Orders are updated based on responses
+5. Results logged and displayed
+
+**Benefits**:
+- Useful for bulk checking
+- Limited to 50 orders to prevent timeout
+- Can be triggered anytime by admin
+
+**Note**: This replaces the old automatic cron-based polling that ran every 20 minutes
 
 ### Payment Status Values
 
@@ -359,47 +350,45 @@ The OCPay API returns one of three statuses:
 | **FAILED** | Payment was declined or cancelled | Set to On-Hold | "Payment failed" |
 | **PENDING** | Payment still processing | No change | "Processing..." |
 
-### Polling Frequency Recommendations
+### When Status is Checked
 
-| Scenario | Frequency | Reason |
-|----------|-----------|--------|
-| Production (Busy Store) | Every 20 minutes | Optimal balance of updates vs. server load |
-| Production (Low Volume) | Every 20-30 minutes | Sufficient for manual checkout frequency |
-| Testing/Sandbox | Every 5 minutes | Faster feedback during testing |
+| Trigger | When It Happens | What Gets Checked |
+|---------|----------------|-------------------|
+| Thank You Page | Customer returns from OCPay | That specific order only |
+| Order View Page | Customer/admin views order | That specific order if pending |
+| Manual Admin Check | Admin clicks check button | Up to 50 most recent pending orders |
 
-### Monitoring Polling Activity
+**Note**: This approach is simpler and more efficient than the old cron-based polling that ran every 20 minutes regardless of activity.
+
+### Monitoring Status Checks
 
 1. **Check Logs**
    - WooCommerce → OCPay → Activity Logs
-   - View polling entries with timestamps
+   - View status check entries with timestamps
 
 2. **Log Entries Include**:
-   - Polling start/end times
-   - Number of orders checked
-   - Number of orders updated
-   - Any errors encountered
+   - When status was checked
+   - Which order was checked
+   - API response received
+   - Whether order was updated
 
 3. **Debug Information**
    - Enable Debug Mode in settings
    - Logs more detailed information
    - Check `/wp-content/debug.log` if WP_DEBUG enabled
 
-### Troubleshooting Polling
-
-**Cron Job Not Running**:
-1. Verify WordPress cron is enabled
-2. Check hosting provider supports WP-Cron
-3. Manually test: `wp cron test` (WP-CLI)
+### Troubleshooting Status Checks
 
 **Orders Not Updating**:
 1. Check API credentials are correct
 2. Verify payment references saved in orders
 3. Check debug logs for API errors
+4. Try manual admin check to test immediately
 
-**Performance Issues**:
-1. Reduce max checks per run (currently 100)
-2. Increase polling interval (currently 20 minutes)
-3. Contact hosting provider about cron optimization
+**Customer Not Seeing Updated Status**:
+1. Make sure customer visited thank you page after payment
+2. Ask customer to refresh their order page
+3. Run manual admin check to force update
 
 ---
 
@@ -862,9 +851,13 @@ add_action('woocommerce_order_status_processing', function($order_id) {
 });
 ```
 
-**wp_scheduled_event_ocpay_check_payment_status**
-- Fired by cron every 20 minutes
-- Used internally for status polling
+**woocommerce_thankyou**
+- Fired when customer returns to thank you page
+- OCPay checks payment status at this time
+
+**woocommerce_view_order**
+- Fired when customer views their order
+- OCPay checks payment status if order is still pending
 
 #### Filters
 
@@ -902,26 +895,23 @@ $order->update_meta_data('_ocpay_payment_confirmed_at',
 $order->save();
 ```
 
-### Cron Schedule
+### Status Checking Hooks
 
-**Schedule Name**: `ocpay_every_20_minutes`
-**Interval**: 1200 seconds (20 minutes)
-**WordPress Hook**: `wp_scheduled_event_ocpay_check_payment_status`
+The plugin uses WordPress and WooCommerce hooks to check payment status on-demand:
 
 ```php
-// Add custom schedule
-add_filter('cron_schedules', function($schedules) {
-    $schedules['ocpay_every_20_minutes'] = [
-        'interval' => 20 * MINUTE_IN_SECONDS,
-        'display'  => 'Every 20 Minutes',
-    ];
-    return $schedules;
+// Check status on thank you page
+add_action('woocommerce_thankyou', function($order_id) {
+    OCPay_Status_Checker::get_instance()->check_status_on_thankyou($order_id);
 });
 
-// Schedule the event
-wp_schedule_event(time(), 'ocpay_every_20_minutes', 
-    'wp_scheduled_event_ocpay_check_payment_status');
+// Check status when viewing order
+add_action('woocommerce_view_order', function($order_id) {
+    OCPay_Status_Checker::get_instance()->check_status_on_order_view($order_id);
+});
 ```
+
+**Note**: No cron jobs or background polling are used. Status is checked only when needed.
 
 ---
 
@@ -956,22 +946,19 @@ wp_schedule_event(time(), 'ocpay_every_20_minutes',
 
 #### 3. Orders not updating to Processing/Completed
 
-**Cause**: Status polling not running or API issues
+**Cause**: Customer hasn't returned to store or API issues
 
 **Solutions**:
-1. Check cron job is enabled: Test with `wp cron test` (WP-CLI)
-2. Verify payment reference stored in order
-3. Check payment status in OCPay dashboard
-4. Enable debug mode for detailed logging
-5. Check WordPress scheduled events
+1. Ask customer to visit their order page (this triggers status check)
+2. Use manual admin check button to force update
+3. Verify payment reference stored in order
+4. Check payment status in OCPay dashboard
+5. Enable debug mode for detailed logging
 
-**To verify cron**:
-```
-WordPress Admin:
-- Install plugin: "WP Control" or "Advanced Cron Manager"
-- Check if "ocpay_check_payment_status" is scheduled
-- Verify next scheduled time is within 20 minutes
-```
+**Quick Fix**:
+- Go to WooCommerce → Settings → Payments → OCPay
+- Click "Manual Check" button
+- This will check up to 50 most recent pending orders
 
 #### 4. "Invalid payment reference" error
 
@@ -1020,18 +1007,14 @@ WordPress Admin:
 
 #### 8. High CPU usage / Performance issues
 
-**Causes**:
-- Cron running too frequently
-- Too many pending orders
-- Slow API responses
+**Note**: With the simplified on-demand checking, performance issues should be rare.
 
-**Solutions**:
-1. Increase cron interval (currently 20 minutes)
-   - Modify in `add_cron_schedules()` function
-2. Reduce max checks per run (currently 100)
-   - Modify `$max_checks_per_run` in `OCPay_Status_Checker`
+**If you still experience issues**:
+1. Check for slow API responses in logs
+2. Limit manual admin checks (currently 50 orders max)
 3. Archive old orders to reduce query time
 4. Contact hosting provider for optimization
+5. Contact OCPay support if API is slow
 
 #### 9. Customer not receiving notifications
 
@@ -1136,7 +1119,7 @@ composer.json                        # Dependencies
 
 1. **OCPay_API_Client**: Handles all API communication
 2. **OCPay_Payment_Gateway**: WooCommerce payment gateway
-3. **OCPay_Status_Checker**: Automatic status polling
+3. **OCPay_Status_Checker**: On-demand status checking
 4. **OCPay_Security**: Security features and validation
 5. **OCPay_Logger**: Logging system
 6. **OCPay_Validator**: Input validation
@@ -1257,36 +1240,41 @@ For detailed documentation, see [.github/WORKFLOW_DOCS.md](.github/WORKFLOW_DOCS
 
 ## Changelog
 
-### Version 1.0.1 (Current)
+### Version 1.2.1 (Current)
 
-**New Features**:
-- Automatic status polling every 20 minutes
+**Major Simplification**:
+- Removed complex cron-based polling system
+- Replaced with simple on-demand status checking
+- Status checked on thank you page (when customer returns)
+- Status checked on order view page (when customer views order)
+- Manual admin check for up to 50 most recent pending orders
+- Much simpler architecture and easier to understand
+
+**Benefits of Simplification**:
+- No background cron jobs consuming server resources
+- Status updates happen when they matter (when customer interacts)
+- Easier to debug and maintain
+- Follows best practices from similar payment gateways
+- Reduced complexity without losing functionality
+
+**What Still Works**:
+- All payment processing functionality
+- Admin settings and configuration
+- Logging and debugging features
+- Manual admin checks
+- Security features
+- API integration
+
+**Previous Features (Still Available)**:
 - Configurable order status after payment (Completed/Processing)
 - On-Hold status for failed payments
 - Comprehensive security enhancements
 - Rate limiting for API requests
 - Input validation and sanitization
-- Security headers implementation
-
-**Improvements**:
-- Enhanced logging system
-- Better error handling
-- Improved cron schedule (20 minutes)
-- HPOS compatibility
-- Better code documentation
-
-**Security**:
 - CSRF protection with nonces
 - SQL injection prevention
 - API key masking in logs
-- Rate limiting
-- Input validation
-- Output escaping
-
-**Bug Fixes**:
-- Fixed cron scheduling
-- Improved order status updates
-- Better error messages
+- HPOS compatibility
 
 ### Version 1.0.0
 
