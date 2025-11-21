@@ -121,92 +121,41 @@ class OCPay_Status_Checker {
 
 	/**
 	 * Check payment status on thank you page
-	 * 
-	 * This is called when customer returns from payment
 	 *
 	 * @param int $order_id Order ID
-	 * @return void
 	 */
 	public function check_status_on_thankyou( $order_id ) {
 		if ( ! $this->ensure_api_client() ) {
 			return;
 		}
 
-		// Only check if this is an OCPay order
 		$order = wc_get_order( $order_id );
-		if ( ! $order || 'ocpay' !== $order->get_payment_method() ) {
-			return;
+		if ( $order && 'ocpay' === $order->get_payment_method() && 'pending' === $order->get_status() ) {
+			$this->check_order_payment_status( $order_id );
 		}
-
-		// Only check if order is still pending
-		if ( 'pending' !== $order->get_status() ) {
-			return;
-		}
-
-		$this->logger->info( 'Checking payment status on thank you page', array( 'order_id' => $order_id ) );
-
-		// Check the order status
-		$this->check_order_payment_status( $order_id );
 	}
 
 	/**
-	 * Manual check of all pending payments (called from admin)
-	 * 
-	 * This is for backward compatibility with the admin manual check button
-	 *
-	 * @return void
+	 * Check all pending payments
 	 */
 	public function check_pending_payments() {
 		if ( ! $this->ensure_api_client() ) {
 			return;
 		}
 
-		$this->logger->info( 'Starting manual payment status check' );
-
-		// Get recent pending orders (limit configurable via filter)
-		$max_orders = apply_filters( 'ocpay_manual_check_limit', 50 );
-		$args = array(
-			'limit'          => $max_orders,
-			'status'         => array( 'pending' ),
+		$query = new WC_Order_Query( array(
+			'limit'          => apply_filters( 'ocpay_manual_check_limit', 50 ),
+			'status'         => 'pending',
 			'payment_method' => 'ocpay',
-			'meta_query'     => array(
-				array(
-					'key'     => '_ocpay_payment_ref',
-					'compare' => 'EXISTS',
-				),
-			),
+			'meta_query'     => array( array( 'key' => '_ocpay_payment_ref', 'compare' => 'EXISTS' ) ),
 			'orderby'        => 'date',
 			'order'          => 'DESC',
 			'return'         => 'ids',
-		);
-
-		$query     = new WC_Order_Query( $args );
-		$order_ids = $query->get_orders();
-
-		if ( empty( $order_ids ) ) {
-			$this->logger->info( 'No pending OCPay orders to check' );
-			return;
-		}
-
-		$this->logger->info( 'Found pending orders to check', array( 'count' => count( $order_ids ) ) );
-
-		// Check each order
-		$checked = 0;
-		$updated = 0;
-
-		foreach ( $order_ids as $order_id ) {
-			$result = $this->check_order_payment_status( $order_id );
-			$checked++;
-
-			if ( $result ) {
-				$updated++;
-			}
-		}
-
-		$this->logger->info( 'Manual payment status check completed', array(
-			'checked' => $checked,
-			'updated' => $updated,
 		) );
+
+		foreach ( $query->get_orders() as $order_id ) {
+			$this->check_order_payment_status( $order_id );
+		}
 	}
 
 
@@ -441,62 +390,38 @@ class OCPay_Status_Checker {
 	}
 
 	/**
-	 * Check status when customer views a specific order page
+	 * Check status when viewing order page
 	 *
 	 * @param int $order_id Order ID
-	 * @return void
 	 */
 	public function check_status_on_order_view( $order_id ) {
-		// Only check if pending
 		$order = wc_get_order( $order_id );
-
-		if ( ! $order || 'pending' !== $order->get_status() || 'ocpay' !== $order->get_payment_method() ) {
-			return;
+		if ( $order && 'pending' === $order->get_status() && 'ocpay' === $order->get_payment_method() ) {
+			$this->check_order_payment_status( $order_id );
 		}
-
-		// Check status silently to get latest status
-		$this->check_order_payment_status( $order_id );
 	}
 
 	/**
-	 * Check status before displaying account orders list
-	 * 
-	 * This runs before the orders list is displayed, checking all pending OCPay orders
-	 * so customers see updated status in their orders list
-	 *
-	 * @return void
+	 * Check status before displaying orders list
 	 */
 	public function check_status_before_account_orders() {
 		if ( ! is_user_logged_in() ) {
 			return;
 		}
 
-		// Get current user's pending OCPay orders (limit to 5 most recent)
 		$query = new WC_Order_Query( array(
 			'limit'          => 5,
-			'status'         => array( 'pending' ),
+			'status'         => 'pending',
 			'payment_method' => 'ocpay',
 			'customer_id'    => get_current_user_id(),
 			'date_created'   => '>=' . strtotime( '-30 days' ),
-			'meta_query'     => array(
-				array(
-					'key'     => '_ocpay_payment_ref',
-					'compare' => 'EXISTS',
-				),
-			),
+			'meta_query'     => array( array( 'key' => '_ocpay_payment_ref', 'compare' => 'EXISTS' ) ),
 			'orderby'        => 'date',
 			'order'          => 'DESC',
 			'return'         => 'ids',
 		) );
 
-		$pending_orders = $query->get_orders();
-
-		if ( empty( $pending_orders ) ) {
-			return;
-		}
-
-		// Check each pending order silently to get latest status
-		foreach ( $pending_orders as $order_id ) {
+		foreach ( $query->get_orders() as $order_id ) {
 			$this->check_order_payment_status( $order_id );
 		}
 	}

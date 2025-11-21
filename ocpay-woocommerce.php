@@ -52,47 +52,28 @@ function ocpay_register_1min_schedule( $schedules ) {
 // Handler for 1-minute polling (only runs when there are pending payments)
 add_action( 'ocpay_check_pending_payments_1min', 'ocpay_handle_1min_polling' );
 function ocpay_handle_1min_polling() {
-	// Check if status checker class is available
-	if ( ! class_exists( 'OCPay_Status_Checker' ) ) {
+	if ( ! class_exists( 'OCPay_Status_Checker' ) || ! class_exists( 'WC_Order_Query' ) ) {
 		return;
 	}
 
-	// Check if there are any pending OCPay orders
-	if ( ! class_exists( 'WC_Order_Query' ) ) {
-		return;
-	}
-
-	// Only check recent orders (last 30 days) for performance
-	$thirty_days_ago = strtotime( '-30 days' );
-
+	// Check for recent pending orders (last 30 days)
 	$query = new WC_Order_Query( array(
 		'limit'          => 1,
-		'status'         => array( 'pending' ),
+		'status'         => 'pending',
 		'payment_method' => 'ocpay',
-		'date_created'   => '>=' . $thirty_days_ago,
-		'meta_query'     => array(
-			array(
-				'key'     => '_ocpay_payment_ref',
-				'compare' => 'EXISTS',
-			),
-		),
+		'date_created'   => '>=' . strtotime( '-30 days' ),
+		'meta_query'     => array( array( 'key' => '_ocpay_payment_ref', 'compare' => 'EXISTS' ) ),
 		'return'         => 'ids',
 	) );
 
-	$pending_orders = $query->get_orders();
-
 	// If no pending orders, stop polling
-	if ( empty( $pending_orders ) ) {
+	if ( empty( $query->get_orders() ) ) {
 		wp_clear_scheduled_hook( 'ocpay_check_pending_payments_1min' );
-		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-			error_log( 'OCPay: No recent pending payments, stopped 1-minute polling' );
-		}
 		return;
 	}
 
 	// Check all pending payments
-	$checker = OCPay_Status_Checker::get_instance();
-	$checker->check_pending_payments();
+	OCPay_Status_Checker::get_instance()->check_pending_payments();
 }
 
 // Declare HPOS compatibility early
