@@ -1,8 +1,8 @@
 <?php
 /**
- * OCPay Status Checker - Payment Status Polling Service
+ * OCPay Status Checker - On-Demand Payment Status Checking
  *
- * Handles automatic and manual payment status checking
+ * Handles payment status checking when WooCommerce pages are loaded
  *
  * @package OCPay_WooCommerce
  */
@@ -12,7 +12,7 @@ defined( 'ABSPATH' ) || exit;
 /**
  * OCPay_Status_Checker class
  *
- * Implements status polling for pending payments
+ * Checks payment status on-demand when customers view order pages
  */
 class OCPay_Status_Checker {
 
@@ -100,6 +100,23 @@ class OCPay_Status_Checker {
 	}
 
 	/**
+	 * Ensure API client is initialized
+	 * 
+	 * @return bool True if API client is initialized, false otherwise
+	 */
+	private function ensure_api_client() {
+		// Reinitialize API client to ensure fresh credentials
+		$this->init_api_client();
+
+		if ( ! $this->api_client ) {
+			$this->logger->error( 'Cannot check payment status: API client not initialized' );
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
 	 * Check payment status on thank you page
 	 * 
 	 * This is called when customer returns from payment
@@ -108,11 +125,7 @@ class OCPay_Status_Checker {
 	 * @return void
 	 */
 	public function check_status_on_thankyou( $order_id ) {
-		// Reinitialize API client to ensure fresh credentials
-		$this->init_api_client();
-
-		if ( ! $this->api_client ) {
-			$this->logger->error( 'Cannot check payment status: API client not initialized' );
+		if ( ! $this->ensure_api_client() ) {
 			return;
 		}
 
@@ -141,11 +154,7 @@ class OCPay_Status_Checker {
 	 * @return void
 	 */
 	public function check_pending_payments() {
-		// Reinitialize API client to ensure fresh credentials
-		$this->init_api_client();
-
-		if ( ! $this->api_client ) {
-			$this->logger->error( 'Cannot check pending payments: API client not initialized' );
+		if ( ! $this->ensure_api_client() ) {
 			return;
 		}
 
