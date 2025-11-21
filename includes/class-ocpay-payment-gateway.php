@@ -389,11 +389,30 @@ class OCPay_Payment_Gateway extends WC_Payment_Gateway {
 			'payment_ref' => $payment_ref,
 		) );
 
+		// Schedule 1-minute polling for this payment
+		$this->schedule_payment_polling();
+
 		// Redirect to payment URL
 		return array(
 			'result'   => 'success',
 			'redirect' => $payment_url,
 		);
+	}
+
+	/**
+	 * Schedule 1-minute polling for pending payments
+	 * 
+	 * This ensures payment validation even if customer doesn't return
+	 *
+	 * @return void
+	 */
+	private function schedule_payment_polling() {
+		// Check if polling is already scheduled
+		if ( ! wp_next_scheduled( 'ocpay_check_pending_payments_1min' ) ) {
+			// Schedule to run every 1 minute
+			wp_schedule_event( time() + 60, 'every_minute', 'ocpay_check_pending_payments_1min' );
+			$this->logger->info( 'Scheduled 1-minute payment polling' );
+		}
 	}
 
 	/**

@@ -37,7 +37,59 @@ if ( ! defined( 'OCPAY_WOOCOMMERCE_BASENAME' ) ) {
 	define( 'OCPAY_WOOCOMMERCE_BASENAME', plugin_basename( __FILE__ ) );
 }
 
-// Cron scheduling removed - status checks now happen on-demand when pages load
+// Register 1-minute cron schedule for active pending payments
+add_filter( 'cron_schedules', 'ocpay_register_1min_schedule', 5 );
+function ocpay_register_1min_schedule( $schedules ) {
+	if ( ! isset( $schedules['every_minute'] ) ) {
+		$schedules['every_minute'] = array(
+			'interval' => 60, // 1 minute
+			'display'  => esc_html__( 'Every Minute', 'ocpay-woocommerce' ),
+		);
+	}
+	return $schedules;
+}
+
+// Handler for 1-minute polling (only runs when there are pending payments)
+add_action( 'ocpay_check_pending_payments_1min', 'ocpay_handle_1min_polling' );
+function ocpay_handle_1min_polling() {
+	// Check if status checker class is available
+	if ( ! class_exists( 'OCPay_Status_Checker' ) ) {
+		return;
+	}
+
+	// Check if there are any pending OCPay orders
+	if ( ! class_exists( 'WC_Order_Query' ) ) {
+		return;
+	}
+
+	$query = new WC_Order_Query( array(
+		'limit'          => 1,
+		'status'         => array( 'pending' ),
+		'payment_method' => 'ocpay',
+		'meta_query'     => array(
+			array(
+				'key'     => '_ocpay_payment_ref',
+				'compare' => 'EXISTS',
+			),
+		),
+		'return'         => 'ids',
+	) );
+
+	$pending_orders = $query->get_orders();
+
+	// If no pending orders, stop polling
+	if ( empty( $pending_orders ) ) {
+		wp_clear_scheduled_hook( 'ocpay_check_pending_payments_1min' );
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			error_log( 'OCPay: No pending payments, stopped 1-minute polling' );
+		}
+		return;
+	}
+
+	// Check all pending payments
+	$checker = OCPay_Status_Checker::get_instance();
+	$checker->check_pending_payments();
+}
 
 // Declare HPOS compatibility early
 add_action( 'before_woocommerce_init', function() {
@@ -62,6 +114,7 @@ register_activation_hook( __FILE__, function() {
 register_deactivation_hook( __FILE__, function() {
 	// Clear any scheduled events
 	wp_clear_scheduled_hook( 'wp_scheduled_event_ocpay_check_payment_status' );
+	wp_clear_scheduled_hook( 'ocpay_check_pending_payments_1min' );
 	flush_rewrite_rules();
 } );
 
