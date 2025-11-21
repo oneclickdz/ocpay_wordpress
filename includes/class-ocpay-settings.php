@@ -266,9 +266,9 @@ class OCPay_Settings {
 		}
 
 		$css_url = OCPAY_WOOCOMMERCE_URL . 'assets/css/admin.css';
-		$js_url = OCPAY_WOOCOMMERCE_URL . 'assets/js/admin.js';
+		$js_url = OCPAY_WOOCOMMERCE_URL . 'assets/js/ocpay.js';
 		
-		// Check if files exist before enqueuing
+		// Enqueue admin CSS
 		if ( file_exists( OCPAY_WOOCOMMERCE_PATH . 'assets/css/admin.css' ) ) {
 			wp_enqueue_style(
 				'ocpay-admin',
@@ -278,7 +278,8 @@ class OCPay_Settings {
 			);
 		}
 
-		if ( file_exists( OCPAY_WOOCOMMERCE_PATH . 'assets/js/admin.js' ) ) {
+		// Enqueue consolidated JS
+		if ( file_exists( OCPAY_WOOCOMMERCE_PATH . 'assets/js/ocpay.js' ) ) {
 			wp_enqueue_script(
 				'ocpay-admin',
 				$js_url,

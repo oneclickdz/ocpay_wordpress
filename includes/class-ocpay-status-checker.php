@@ -64,6 +64,7 @@ class OCPay_Status_Checker {
 		add_action( 'wp_ajax_ocpay_check_payment_status', array( $this, 'ajax_check_payment_status' ) );
 		add_action( 'woocommerce_thankyou', array( $this, 'check_status_on_thankyou' ), 10, 1 );
 		add_action( 'woocommerce_view_order', array( $this, 'check_status_on_order_view' ), 10, 1 );
+		add_action( 'woocommerce_before_account_orders', array( $this, 'check_status_before_account_orders' ), 10 );
 	}
 
 	/**
@@ -440,7 +441,7 @@ class OCPay_Status_Checker {
 	}
 
 	/**
-	 * Check status when customer views order page
+	 * Check status when customer views a specific order page
 	 *
 	 * @param int $order_id Order ID
 	 * @return void
@@ -453,8 +454,51 @@ class OCPay_Status_Checker {
 			return;
 		}
 
-		// Check status silently
+		// Check status silently to get latest status
 		$this->check_order_payment_status( $order_id );
+	}
+
+	/**
+	 * Check status before displaying account orders list
+	 * 
+	 * This runs before the orders list is displayed, checking all pending OCPay orders
+	 * so customers see updated status in their orders list
+	 *
+	 * @return void
+	 */
+	public function check_status_before_account_orders() {
+		if ( ! is_user_logged_in() ) {
+			return;
+		}
+
+		// Get current user's pending OCPay orders (limit to 5 most recent)
+		$query = new WC_Order_Query( array(
+			'limit'          => 5,
+			'status'         => array( 'pending' ),
+			'payment_method' => 'ocpay',
+			'customer_id'    => get_current_user_id(),
+			'date_created'   => '>=' . strtotime( '-30 days' ),
+			'meta_query'     => array(
+				array(
+					'key'     => '_ocpay_payment_ref',
+					'compare' => 'EXISTS',
+				),
+			),
+			'orderby'        => 'date',
+			'order'          => 'DESC',
+			'return'         => 'ids',
+		) );
+
+		$pending_orders = $query->get_orders();
+
+		if ( empty( $pending_orders ) ) {
+			return;
+		}
+
+		// Check each pending order silently to get latest status
+		foreach ( $pending_orders as $order_id ) {
+			$this->check_order_payment_status( $order_id );
+		}
 	}
 
 

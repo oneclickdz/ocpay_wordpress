@@ -94,10 +94,10 @@ class OCPay_Payment_Gateway extends WC_Payment_Gateway {
 			OCPAY_WOOCOMMERCE_VERSION
 		);
 
-		// Enqueue frontend JavaScript
+		// Enqueue consolidated JavaScript
 		wp_enqueue_script(
 			'ocpay-frontend',
-			OCPAY_WOOCOMMERCE_URL . 'assets/js/frontend.js',
+			OCPAY_WOOCOMMERCE_URL . 'assets/js/ocpay.js',
 			array( 'jquery', 'wc-checkout' ),
 			OCPAY_WOOCOMMERCE_VERSION,
 			true
