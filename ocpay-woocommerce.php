@@ -62,10 +62,14 @@ function ocpay_handle_1min_polling() {
 		return;
 	}
 
+	// Only check recent orders (last 30 days) for performance
+	$thirty_days_ago = strtotime( '-30 days' );
+
 	$query = new WC_Order_Query( array(
 		'limit'          => 1,
 		'status'         => array( 'pending' ),
 		'payment_method' => 'ocpay',
+		'date_created'   => '>=' . $thirty_days_ago,
 		'meta_query'     => array(
 			array(
 				'key'     => '_ocpay_payment_ref',
@@ -81,7 +85,7 @@ function ocpay_handle_1min_polling() {
 	if ( empty( $pending_orders ) ) {
 		wp_clear_scheduled_hook( 'ocpay_check_pending_payments_1min' );
 		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
-			error_log( 'OCPay: No pending payments, stopped 1-minute polling' );
+			error_log( 'OCPay: No recent pending payments, stopped 1-minute polling' );
 		}
 		return;
 	}

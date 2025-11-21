@@ -162,9 +162,10 @@ class OCPay_Status_Checker {
 
 		$this->logger->info( 'Starting manual payment status check' );
 
-		// Get recent pending orders (limit to 50 for manual check)
+		// Get recent pending orders (limit configurable via filter)
+		$max_orders = apply_filters( 'ocpay_manual_check_limit', 50 );
 		$args = array(
-			'limit'          => 50,
+			'limit'          => $max_orders,
 			'status'         => array( 'pending' ),
 			'payment_method' => 'ocpay',
 			'meta_query'     => array(
@@ -236,9 +237,16 @@ class OCPay_Status_Checker {
 			return false;
 		}
 
-		// Note: We no longer check order age (previously limited to 24 hours)
-		// With on-demand checking, we check whenever requested regardless of age
-		// This allows customers to complete payment at any time
+		// Check order age - skip if older than 30 days to prevent unnecessary API calls
+		$order_date = $order->get_date_created();
+		$age_days = ( time() - $order_date->getTimestamp() ) / DAY_IN_SECONDS;
+		if ( $age_days > 30 ) {
+			$this->logger->debug( 'Skipping old pending order', array(
+				'order_id'  => $order_id,
+				'age_days' => round( $age_days, 1 ),
+			) );
+			return false;
+		}
 
 		$this->logger->debug( 'Checking payment status for order', array(
 			'order_id'    => $order_id,

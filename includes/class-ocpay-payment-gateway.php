@@ -402,16 +402,17 @@ class OCPay_Payment_Gateway extends WC_Payment_Gateway {
 	/**
 	 * Schedule 1-minute polling for pending payments
 	 * 
-	 * This ensures payment validation even if customer doesn't return
+	 * This ensures payment validation even if customer doesn't return.
+	 * Only schedules if not already scheduled (multiple orders can create payments simultaneously)
 	 *
 	 * @return void
 	 */
 	private function schedule_payment_polling() {
 		// Check if polling is already scheduled
 		if ( ! wp_next_scheduled( 'ocpay_check_pending_payments_1min' ) ) {
-			// Schedule to run every 1 minute
+			// Schedule to run every 1 minute starting in 60 seconds
 			wp_schedule_event( time() + 60, 'every_minute', 'ocpay_check_pending_payments_1min' );
-			$this->logger->info( 'Scheduled 1-minute payment polling' );
+			$this->logger->info( 'Scheduled 1-minute payment polling (auto-stops when no pending payments)' );
 		}
 	}
 
