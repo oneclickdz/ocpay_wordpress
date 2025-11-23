@@ -59,6 +59,22 @@ class WC_Gateway_OCPay extends WC_Payment_Gateway {
 		add_action( 'load-woocommerce_page_wc-orders', array( $this, 'check_pending_orders_list_admin' ), 1 );
 	}
 
+
+
+	/**
+	 * Check if this gateway is available for use.
+	 *
+	 * @return bool
+	 */
+	public function is_available() {
+		$is_available = parent::is_available();
+		// Only allow DZD currency
+		if ( 'DZD' !== get_woocommerce_currency() ) {
+			return false;
+		}
+		return $is_available;
+	}
+
 	/**
 	 * Initialize Gateway Settings Form Fields.
 	 */
