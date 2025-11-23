@@ -3,7 +3,7 @@
  * Plugin Name: OCPay WooCommerce Gateway
  * Plugin URI: https://oneclickdz.com
  * Description: A simple WooCommerce payment gateway for OCPay.
- * Version: 2.0.0
+ * Version: 2.1.0
  * Author: OneClickDz - ZH
  * Author URI: https://oneclickdz.com
  * Text Domain: ocpay-gateway
@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'OCPAY_VERSION', '2.0.0' );
+define( 'OCPAY_VERSION', '2.1.0' );
 define( 'OCPAY_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 
 /**
